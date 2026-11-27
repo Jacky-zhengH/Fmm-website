@@ -7,7 +7,7 @@
   "subtitle": "第 200 天，寄给芙芙的一封信。",
   "signature": "",
   "animations": true,
-  "draft": true,
+  "draft": false,
   "music": {
     "title": "サカナクション · ドキュメント",
     "src": "music/document-web.mp3",
@@ -26,19 +26,28 @@
   },
   "poster": {
     "message": "",
-    "accent": "#d3b583"
+    "accent": "#d3b583",
+    "avatars": {
+      "left": "images/poster/avatar-author.png",
+      "right": "images/poster/avatar-fmm.png"
+    },
+    "storybookArtwork": "images/poster/storybook-silhouettes.webp"
   },
   "chapters": [
     {
       "id": "first-meeting",
-      "title": "最初的相遇",
+      "title": "在月亮下相遇的第二百天",
       "image": "images/nemu-at-the-desk.webp",
+      "imageWidth": 1600,
+      "imageHeight": 900,
       "imageAlt": "暖黄色的窗光下，芙眠眠趴在摆着书本的桌前。"
     },
     {
       "id": "memories",
       "title": "200 天里的回忆",
       "image": "images/nemu-sakura-stairs.webp",
+      "imageWidth": 900,
+      "imageHeight": 1600,
       "imageAlt": "芙眠眠坐在樱花树下的木楼梯上。"
     },
     {
@@ -51,8 +60,15 @@
     },
     {
       "id": "future",
-      "title": "写给未来的祝福",
+      "title": "写给未来的祝福"
+    },
+    {
+      "id": "storybook",
+      "title": "旅者、小丑和小狐狸",
+      "paper": "storybook",
       "image": "images/nemu-with-sakura.webp",
+      "imageWidth": 1600,
+      "imageHeight": 900,
       "imageAlt": "深色背景里飘着发光的花瓣，芙眠眠手持一枝樱花。"
     }
   ]

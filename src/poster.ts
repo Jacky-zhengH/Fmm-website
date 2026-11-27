@@ -14,6 +14,7 @@ interface PosterOptions {
   signature?: string
   accent?: string
   artwork?: string
+  avatars?: { left?: string; right?: string }
 }
 
 const serif = 'Georgia, "Songti SC", SimSun, "Noto Serif CJK SC", serif'
@@ -171,6 +172,93 @@ function illustration(
   context.restore()
 }
 
+function avatarMedallion(context: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, radius: number, accent: string) {
+  context.save()
+  context.fillStyle = '#171a28'
+  context.shadowColor = '#070910e0'
+  context.shadowBlur = 17
+  context.shadowOffsetY = 5
+  context.beginPath()
+  context.arc(x, y, radius + 6, 0, Math.PI * 2)
+  context.fill()
+  context.restore()
+
+  context.save()
+  context.beginPath()
+  context.arc(x, y, radius, 0, Math.PI * 2)
+  context.clip()
+  const scale = radius * 2 / Math.min(image.naturalWidth, image.naturalHeight)
+  const width = image.naturalWidth * scale
+  const height = image.naturalHeight * scale
+  context.drawImage(image, x - width / 2, y - height / 2, width, height)
+  context.restore()
+
+  context.save()
+  const metal = context.createLinearGradient(x - radius, y - radius, x + radius, y + radius)
+  metal.addColorStop(0, '#fff1d0')
+  metal.addColorStop(0.42, accent)
+  metal.addColorStop(0.7, '#826b50')
+  metal.addColorStop(1, '#e5c9a0')
+  context.strokeStyle = metal
+  for (const [ringRadius, weight] of [[radius, 3], [radius + 6, 1.5]]) {
+    context.lineWidth = weight
+    context.beginPath()
+    context.arc(x, y, ringRadius, 0, Math.PI * 2)
+    context.stroke()
+  }
+  context.restore()
+}
+
+function portraitLinks(
+  context: CanvasRenderingContext2D, x: number, y: number, moonRadius: number, accent: string, landscape: boolean,
+  left?: HTMLImageElement, right?: HTMLImageElement,
+) {
+  const offset = landscape ? 413 : 346
+  const avatarRadius = landscape ? 87 : 76
+  const baseY = y + moonRadius * 0.55
+  if (left && right) {
+    const lineStart = x - offset + avatarRadius + 5
+    const lineEnd = x + offset - avatarRadius - 5
+    const points: [number, number][] = [
+      [lineStart, baseY],
+      [x - moonRadius * 0.44, baseY],
+      [x - moonRadius * 0.36, baseY - moonRadius * 0.048],
+      [x - moonRadius * 0.27, baseY],
+      [x - moonRadius * 0.17, baseY],
+      [x - moonRadius * 0.09, baseY + moonRadius * 0.077],
+      [x, baseY - moonRadius * 0.212],
+      [x + moonRadius * 0.11, baseY + moonRadius * 0.102],
+      [x + moonRadius * 0.21, baseY],
+      [x + moonRadius * 0.3, baseY],
+      [x + moonRadius * 0.38, baseY - moonRadius * 0.045],
+      [x + moonRadius * 0.47, baseY],
+      [lineEnd, baseY],
+    ]
+
+    context.save()
+    context.lineCap = 'round'
+    context.lineJoin = 'round'
+    context.lineWidth = 5.5
+    context.strokeStyle = '#1a17249c'
+    path(context, points)
+
+    const gold = context.createLinearGradient(lineStart, baseY, lineEnd, baseY)
+    gold.addColorStop(0, accent)
+    gold.addColorStop(0.39, '#f8dbac')
+    gold.addColorStop(0.52, '#ffc3ba')
+    gold.addColorStop(0.67, '#f8dbac')
+    gold.addColorStop(1, accent)
+    context.lineWidth = 2.7
+    context.strokeStyle = gold
+    context.shadowBlur = 7
+    context.shadowColor = '#f4bd9e70'
+    path(context, points)
+    context.restore()
+  }
+  if (left) avatarMedallion(context, left, x - offset, baseY, avatarRadius, accent)
+  if (right) avatarMedallion(context, right, x + offset, baseY, avatarRadius, accent)
+}
+
 function frame(context: CanvasRenderingContext2D, width: number, height: number, margin: number, accent: string) {
   context.save()
   context.strokeStyle = accent
@@ -223,7 +311,7 @@ function messageText(context: CanvasRenderingContext2D, text: string, x: number,
   return Math.min(lines.length, maxLines) * 39
 }
 
-function loadArtwork(source?: string): Promise<HTMLImageElement | undefined> {
+export function loadArtwork(source?: string): Promise<HTMLImageElement | undefined> {
   if (!source) return Promise.resolve(undefined)
 
   let url: URL
@@ -252,7 +340,12 @@ function loadArtwork(source?: string): Promise<HTMLImageElement | undefined> {
 export async function renderPoster(canvas: HTMLCanvasElement, size: PosterSize, options: PosterOptions): Promise<void> {
   const request = Symbol()
   pending.set(canvas, request)
-  const [artwork] = await Promise.all([loadArtwork(options.artwork), document.fonts?.ready])
+  const [artwork, leftAvatar, rightAvatar] = await Promise.all([
+    loadArtwork(options.artwork),
+    loadArtwork(options.avatars?.left),
+    loadArtwork(options.avatars?.right),
+    document.fonts?.ready,
+  ])
   if (pending.get(canvas) !== request) return
   pending.delete(canvas)
 
@@ -273,6 +366,7 @@ export async function renderPoster(canvas: HTMLCanvasElement, size: PosterSize, 
   sky(context, width, height, centerX, centerY, radius)
   frame(context, width, height, frameMargin, accent)
   illustration(context, centerX, centerY, radius, accent, artwork)
+  portraitLinks(context, centerX, centerY, radius, accent, landscape, leftAvatar, rightAvatar)
 
   const labelLeft = frameMargin + 45
   const labelRight = width - labelLeft

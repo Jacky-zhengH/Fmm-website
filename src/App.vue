@@ -3,13 +3,15 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import AtmosphereLyrics from './AtmosphereLyrics.vue'
 import { Music } from './audio'
 import type { Playback } from './audio'
-import { clockFrom, getCountdown } from './clock'
+import { warmChapterImage } from './chapter-images'
+import { clockFrom, getCountdown, isPublicReviewPath } from './clock'
 import { loadLetter, loadMemory, memoryAsset, memoryPath, memoryTrack } from './content'
 import type { Memory } from './content'
 import { parseBilingualLyrics } from './lyrics'
 import type { LyricCue } from './lyrics'
 import { posterSizes, renderPoster } from './poster'
 import type { PosterSize } from './poster'
+import { renderStorybookPoster } from './storybook-poster'
 
 type Phase = 'loading' | 'waiting' | 'arriving' | 'ready' | 'opening' | 'reading' | 'finale' | 'poster' | 'error'
 
@@ -33,6 +35,8 @@ const lyrics = ref<LyricCue[]>([])
 const lyricsShown = ref(true)
 const lyricsEnabled = computed(() => lyrics.value.length > 0 && lyricsShown.value)
 const lyricsActive = computed(() => playback.value.status !== 'ended' && playback.value.status !== 'error')
+const posterDesigns = { moon: '月亮纪念', storybook: '童话信笺' } as const
+const posterDesign = ref<keyof typeof posterDesigns>('moon')
 const posterSize = ref<PosterSize>('portrait')
 const posterCanvas = ref<HTMLCanvasElement>()
 const posterUrl = ref('')
@@ -198,6 +202,8 @@ function showChapter(index: number) {
   chapterIndex.value = index
   imageFailed.value = false
   phase.value = 'reading'
+  const nextIllustration = memory.value.chapters.find((candidate, position) => position > index && candidate.image)
+  warmChapterImage(memoryAsset(nextIllustration?.image))
   focusScene()
 }
 
@@ -252,15 +258,30 @@ async function drawPoster() {
   if (posterUrl.value) URL.revokeObjectURL(posterUrl.value)
   posterUrl.value = ''
   try {
-    await renderPoster(sheet, posterSize.value, {
+    const poster = memory.value.poster
+    const occasion = {
       recipient: memory.value.recipient,
       days: memory.value.days,
       date: memory.value.displayDate,
-      signature: memory.value.signature,
-      message: memory.value.poster?.message,
-      accent: memory.value.poster?.accent,
-      artwork: memoryAsset(memory.value.poster?.artwork),
-    })
+    }
+    if (posterDesign.value === 'storybook') {
+      await renderStorybookPoster(sheet, posterSize.value, {
+        ...occasion,
+        artwork: memoryAsset(poster?.storybookArtwork),
+      })
+    } else {
+      await renderPoster(sheet, posterSize.value, {
+        ...occasion,
+        signature: memory.value.signature,
+        message: poster?.message,
+        accent: poster?.accent,
+        artwork: memoryAsset(poster?.artwork),
+        avatars: {
+          left: memoryAsset(poster?.avatars?.left),
+          right: memoryAsset(poster?.avatars?.right),
+        },
+      })
+    }
     if (revision !== posterRevision || !posterCanvas.value) return
     posterCanvas.value.width = sheet.width
     posterCanvas.value.height = sheet.height
@@ -304,7 +325,9 @@ onMounted(async () => {
   try {
     memory.value = await loadMemory()
     if (archive) return
-    if (!__INTERNAL_REVIEW__ && now() < Date.parse(memory.value.unlockAt)) {
+    const firstIllustration = memory.value.chapters.find(candidate => candidate.image)
+    warmChapterImage(memoryAsset(firstIllustration?.image))
+    if (!__INTERNAL_REVIEW__ && !isPublicReviewPath(location.pathname) && now() < Date.parse(memory.value.unlockAt)) {
       phase.value = 'waiting'
       updateClock()
       if (phase.value === 'waiting') clockTimer = window.setInterval(updateClock, 200)
@@ -415,13 +438,16 @@ onUnmounted(() => {
       </section>
 
       <section v-else-if="memory && chapter && phase === 'reading'" class="reading page-width" :class="{ 'with-lyrics': lyricsEnabled }" :style="chapterBackground">
-        <article :key="chapter.id" class="letter-paper" :class="`chapter-enter-${chapter.enter || 'fade'}`">
+        <article :key="chapter.id" class="letter-paper"
+                 :class="[`chapter-enter-${chapter.enter || 'fade'}`, { 'storybook-paper': chapter.paper === 'storybook' }]">
           <header class="paper-head">
             <h1 ref="heading" tabindex="-1">{{ chapter.title }}</h1>
             <p v-if="memory.draft" class="draft-note">试读版 · 正文待替换</p>
           </header>
           <div class="letter-content" :class="{ illustrated: image && !imageFailed }">
             <div class="letter-text">
+              <img v-if="image && !imageFailed" class="chapter-image" :src="image" :alt="chapter.imageAlt || ''"
+                   :width="chapter.imageWidth" :height="chapter.imageHeight" decoding="async" @error="imageFailed = true">
               <p v-if="letterStatus === 'pending'" role="status">正在取出信纸…</p>
               <div v-else-if="letterStatus === 'error'">
                 <p>来信暂时无法读取。</p>
@@ -433,7 +459,6 @@ onUnmounted(() => {
               </template>
               <p v-if="memory.signature && chapterIndex === memory.chapters.length - 1" class="signature">{{ memory.signature }}</p>
             </div>
-            <img v-if="image && !imageFailed" class="chapter-image" :src="image" :alt="chapter.imageAlt || ''" decoding="async" @error="imageFailed = true">
           </div>
           <nav class="letter-nav" aria-label="章节翻页">
             <button type="button" class="text-action" :disabled="chapterIndex === 0" @click="chapterStep(-1)">上一章</button>
@@ -460,11 +485,15 @@ onUnmounted(() => {
           <div class="poster-controls">
             <p class="kicker">{{ memory.title }}</p>
             <h1 ref="heading" tabindex="-1">纪念海报</h1>
+            <label for="poster-design">海报样式</label>
+            <select id="poster-design" v-model="posterDesign" @change="drawPoster">
+              <option v-for="(label, design) in posterDesigns" :key="design" :value="design">{{ label }}</option>
+            </select>
             <label for="poster-size">海报尺寸</label>
             <select id="poster-size" v-model="posterSize" @change="drawPoster">
               <option v-for="(size, key) in posterSizes" :key="key" :value="key">{{ size.label }} · {{ size.width }} × {{ size.height }}</option>
             </select>
-            <a v-if="posterUrl" class="action" :href="posterUrl" :download="`nemu-200-${posterSize}.png`">保存 PNG</a>
+            <a v-if="posterUrl" class="action" :href="posterUrl" :download="`nemu-200-${posterDesign}-${posterSize}.png`">保存 PNG</a>
             <a v-if="posterUrl" class="text-action" :href="posterUrl" target="_blank" rel="noopener">打开原图</a>
             <button type="button" class="text-action" @click="setCapture(true)">纯净截图模式</button>
             <button type="button" class="text-action back-to-finale" @click="showFinale">返回落幕</button>
@@ -474,7 +503,7 @@ onUnmounted(() => {
                             :shown="lyricsActive"/>
         </div>
         <figure class="poster-sheet">
-          <canvas ref="posterCanvas" role="img" :aria-label="`${memory.recipient} ${memory.days} 天纪念海报`">{{ memory.recipient }} · {{ memory.days }} DAYS · {{ memory.displayDate }}</canvas>
+          <canvas ref="posterCanvas" role="img" :aria-label="`${memory.recipient} ${memory.days} 天 · ${posterDesigns[posterDesign]}`">{{ memory.recipient }} · {{ memory.days }} DAYS · {{ memory.displayDate }}</canvas>
           <button v-if="capture" ref="heading" type="button" class="exit-capture" aria-label="退出纯净截图模式" title="点击或按 Esc 退出" @click="setCapture(false)"></button>
         </figure>
       </section>

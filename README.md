@@ -13,10 +13,11 @@ npm run dev
 
 - [纪念档案](http://127.0.0.1:5173/)
 - [Nemu · 200 Days](http://127.0.0.1:5173/memories/nemu-200/)
+- [免登录预览](http://127.0.0.1:5173/memories/nemu-200/preview/)
 - [从零点前五秒开始预览](http://127.0.0.1:5173/memories/nemu-200/?at=2026-11-27T23%3A59%3A55%2B08%3A00)
 - [直接预览零点后的信封](http://127.0.0.1:5173/memories/nemu-200/?at=2026-11-28T00%3A00%3A01%2B08%3A00)
 
-模拟从 URL 指定的北京时间开始按实际经过时间推进。生产构建忽略 `at`。用 `npm run build` 检查类型并生成 `dist/`，然后用 `npm run preview` 预览生产产物。两条路径都有自己的 HTML，适合直接访问和刷新。
+模拟从 URL 指定的北京时间开始按实际经过时间推进。生产构建忽略 `at`。用 `npm run build` 检查类型并生成 `dist/`，然后用 `npm run preview` 预览生产产物。档案、特辑和免登录预览都有自己的 HTML，可以直接访问和刷新。
 
 ## 替换信件、图片和音乐
 
@@ -25,11 +26,13 @@ npm run dev
 | 路径 | 用途 |
 | --- | --- |
 | `letter.md` | 用 `## 章节名` 划分各章，段落之间空一行。标题须与配置中的 `title` 一致。 |
-| `config.json` | 编辑 `recipient`、`days`、`unlockAt`、`displayDate`、`subtitle`、`signature`、章节顺序、音乐及海报。`unlockAt` 保持带时区的 ISO 时间。正式内容齐备后将 `draft` 改为 `false`。 |
-| `images/` | 放 Fmm 立绘、截图和图像。推荐透明 PNG 或 WebP。章节可选 `image`、`imageAlt`、`background`。图片路径如 `images/portrait.webp`，背景也可填 CSS 颜色。 |
+| `config.json` | 编辑 `recipient`、`days`、`unlockAt`、`displayDate`、`subtitle`、`signature`、章节顺序、音乐及海报。章节可设 `paper: "storybook"` 使用童话信纸。`unlockAt` 保持带时区的 ISO 时间。正式内容齐备后将 `draft` 改为 `false`。 |
+| `images/` | 放 Fmm 立绘、截图和图像。推荐透明 PNG 或 WebP。章节可设 `image`、`imageAlt`、`imageWidth`、`imageHeight` 和 `background`。填写图片原始宽高可以提前留出位置。 |
 | `music/` | 存放网站使用的音频。当前使用《ドキュメント》的 192 kbps 网页 MP3。 |
 
-活动级 `music` 配置一首曲目，`title` 为曲名，`volume` 是 0–1 的初始增益，`music.src` 是活动目录内的相对路径。`music.cues` 按播放秒数切换环境色，章节的 `enter` 可填 `fade` 或 `rise`，`exit` 可填 `fade`，`animations` 可关闭活动过场。海报的 `poster` 可配置 `message`、`accent` 和可选的 `artwork`。
+活动级 `music` 配置一首曲目，`title` 为曲名，`volume` 是 0–1 的初始增益，`music.src` 是活动目录内的相对路径。`music.cues` 按播放秒数切换环境色，章节的 `enter` 可填 `fade` 或 `rise`，`exit` 可填 `fade`，`animations` 可关闭活动过场。
+
+读到落幕后，可在海报页切换月亮纪念和童话信笺，并分别保存 PNG。`poster.avatars` 设置月亮左右头像，`poster.storybookArtwork` 设置童话插图，均使用活动目录内的相对路径。月亮海报还支持 `message`、`accent` 和 `artwork`。
 
 ## 《ドキュメント》配乐
 
@@ -56,7 +59,7 @@ npm run dev
 
 两份文件用相同的时间戳（例如 `[00:12.34]`）配对。`[offset:+250]` 可让字幕提前 250 毫秒，负值用于延后。中文文件省略 `offset` 时沿用日语偏移。若两份都注明偏移，按调整后的时间配对。每句最多保留 8 秒。没有设置活动歌词时，Vite 开发版可读取 `local-media/document.ja.lrc` 和 `local-media/document.zh.lrc`。
 
-建议默读版正文保留 **800–900 个汉字**，标题和歌词另计。按每分钟 230 字的编排节奏估算，正文约占 3:29–3:55，在 4:44.814 的配乐里留约 50–76 秒给插图、偶尔抬眼看字幕和落幕。宽屏把正文与插图并排，窄屏上下排列。纸张底部可翻页，电脑也可用方向键左右翻章，较长的正文可以自然滚动。
+当前特辑按原稿保留五章正文和一篇童话附页。宽屏正文沿插图环绕，图底以下恢复通栏。窄屏将插图放到开头段落之后。页面会提前准备第一张插图，阅读时也会准备后面最近的一张。纸张底部可翻页，电脑也可用方向键左右翻章，较长的正文可以自然滚动。
 
 ## Cloudflare Pages
 
@@ -68,4 +71,6 @@ npm run dev
 
 内测分支固定为 `codex/internal-review`。Cloudflare Pages 构建注入的 `CF_PAGES_BRANCH` 与分支完全一致时，预览域名下的 `/memories/nemu-200/` 直接进入已解封的信封，沿用正式的拆信、阅读和海报流程。搭建分支预览前在 Cloudflare Pages 启用 Access 并核实未登录访客会被拦截。本机可在运行 `npm run build` 前将 `CF_PAGES_BRANCH` 设为该分支值，构建后清除该变量，再用 `npm run preview` 查看产物。[Cloudflare 预览访问设置](https://developers.cloudflare.com/pages/configuration/preview-deployments/#customize-preview-deployments-access)
 
-两个 HTML 和 Cloudflare 的 `_headers` 都声明了 `noindex`。纯前端时间锁依赖访客设备时间。静态托管会公开 `letter.md` 和其他资源，知道路径的人在解封前也能请求。若正文必须等到零点才可获取，请先留在本地，待零点后发布正文或另行确认服务端方案。
+免登录预览使用正式站的 `/memories/nemu-200/preview/`，打开后即可拆信。发给收信人的正式链接使用 `/memories/nemu-200/`，按原定北京时间解封。两个地址可直接使用 Cloudflare Pages 提供的 `pages.dev` 域名。
+
+所有 HTML 和 Cloudflare 的 `_headers` 都声明了 `noindex`。纯前端时间锁依赖访客设备时间。静态托管会公开 `letter.md` 和其他资源，知道路径的人在解封前也能请求。若正文必须等到零点才可获取，请先留在本地，待零点后发布正文或另行确认服务端方案。

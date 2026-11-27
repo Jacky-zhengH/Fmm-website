@@ -9,6 +9,9 @@
 /memories/nemu-200/
   Cache-Control: no-cache
 
+/memories/nemu-200/preview/
+  Cache-Control: no-cache
+
 /memories/nemu-200/config.json
   Cache-Control: no-cache
 

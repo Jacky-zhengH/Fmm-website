@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { clockFrom, getCountdown } from '../src/clock.ts'
+import { clockFrom, getCountdown, isPublicReviewPath } from '../src/clock.ts'
 
 const midnight = Date.parse('2026-11-28T00:00:00+08:00')
 
@@ -27,4 +27,13 @@ test('a paused tab catches up in one update using elapsed wall time', () => {
 test('missing or invalid simulation falls back to system time', () => {
   assert.equal(clockFrom('invalid', () => midnight)(), midnight)
   assert.equal(clockFrom(null, () => midnight)(), midnight)
+})
+
+test('only the dedicated preview page has the public review route', () => {
+  for (const path of ['/memories/nemu-200/preview', '/memories/nemu-200/preview/', '/memories/nemu-200/preview/index.html']) {
+    assert.equal(isPublicReviewPath(path), true)
+  }
+  for (const path of ['/', '/memories/nemu-200/', '/memories/nemu-200/index.html', '/memories/nemu-200/preview/other']) {
+    assert.equal(isPublicReviewPath(path), false)
+  }
 })
