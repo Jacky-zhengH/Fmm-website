@@ -1,0 +1,19 @@
+/*
+  X-Robots-Tag: noindex, nofollow
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+
+/
+  Cache-Control: no-cache
+
+/memories/nemu-200/
+  Cache-Control: no-cache
+
+/memories/nemu-200/config.json
+  Cache-Control: no-cache
+
+/memories/nemu-200/letter.md
+  Cache-Control: no-cache
+
+/assets/*
+  Cache-Control: public, max-age=31556952, immutable

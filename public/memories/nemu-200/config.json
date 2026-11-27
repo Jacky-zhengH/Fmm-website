@@ -1,0 +1,65 @@
+{
+  "title": "Nemu · 200 Days",
+  "recipient": "芙眠眠 Nemu",
+  "days": 200,
+  "unlockAt": "2026-11-28T00:00:00+08:00",
+  "displayDate": "2026.11.28",
+  "subtitle": "第 200 天，寄给芙芙的一封信。",
+  "signature": "",
+  "animations": true,
+  "draft": true,
+  "waitingMusic": {
+    "src": "music/demo-night.mp3",
+    "title": "深夜频率（试听）",
+    "volume": 0.48,
+    "loop": true,
+    "fade": 2.5
+  },
+  "finaleMusic": {
+    "src": "music/demo-dawn.mp3",
+    "title": "天光之前（试听）",
+    "volume": 0.48,
+    "loop": true,
+    "fade": 2.5
+  },
+  "poster": {
+    "message": "",
+    "accent": "#d3b583"
+  },
+  "chapters": [
+    {
+      "id": "first-meeting",
+      "title": "最初的相遇",
+      "music": {
+        "src": "music/demo-dawn.mp3",
+        "title": "天光之前（试听）",
+        "volume": 0.48,
+        "loop": true,
+        "fade": 2.5
+      }
+    },
+    {
+      "id": "memories",
+      "title": "200 天里的回忆",
+      "music": {
+        "src": "music/demo-night.mp3",
+        "title": "深夜频率（试听）",
+        "volume": 0.48,
+        "loop": true,
+        "fade": 2.5
+      }
+    },
+    {
+      "id": "companionship",
+      "title": "陪伴与感受"
+    },
+    {
+      "id": "what-to-say",
+      "title": "想对芙芙说的话"
+    },
+    {
+      "id": "future",
+      "title": "写给未来的祝福"
+    }
+  ]
+}
