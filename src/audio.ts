@@ -59,6 +59,15 @@ export class Music {
     this.applyLevel()
   }
 
+  seek(seconds: number) {
+    const duration = this.playback.duration
+    if (!duration || !Number.isFinite(seconds)) return
+    const position = Math.min(duration, Math.max(0, seconds))
+    this.audio.currentTime = position
+    const status = this.playback.status
+    this.update(status === 'ended' && position < duration ? 'paused' : status)
+  }
+
   dispose() {
     this.attempt++
     this.events.abort()
@@ -70,7 +79,7 @@ export class Music {
 
   private listen() {
     const options = { signal: this.events.signal }
-    for (const event of ['loadedmetadata', 'durationchange', 'timeupdate']) {
+    for (const event of ['loadedmetadata', 'durationchange', 'timeupdate', 'seeking', 'seeked']) {
       this.audio.addEventListener(event, () => this.update(), options)
     }
     this.audio.addEventListener('pause', () => {

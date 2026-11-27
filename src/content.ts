@@ -26,6 +26,7 @@ export interface Memory {
     src?: string
     fallback?: Track
     cues?: { at: number; tone: 'dawn' | 'clear' | 'tide' | 'tail' }[]
+    lyrics?: { japanese: string; chinese: string }
   }
   poster?: { message?: string; accent?: string; artwork?: string }
   chapters: Chapter[]

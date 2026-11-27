@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import AtmosphereLyrics from './AtmosphereLyrics.vue'
 import { Music } from './audio'
 import type { Playback } from './audio'
 import { clockFrom, getCountdown } from './clock'
 import { loadLetter, loadMemory, memoryAsset, memoryPath, memoryTrack } from './content'
 import type { Memory } from './content'
+import { parseBilingualLyrics } from './lyrics'
+import type { LyricCue } from './lyrics'
 import { posterSizes, renderPoster } from './poster'
 import type { PosterSize } from './poster'
 
@@ -15,6 +18,7 @@ const archive = location.pathname === '/' || location.pathname === '/index.html'
 const isDevelopment = import.meta.env.DEV
 const localMusic = isDevelopment && typeof __LOCAL_DOCUMENT_AUDIO__ !== 'undefined' ? __LOCAL_DOCUMENT_AUDIO__ : ''
 const simulatedAt = isDevelopment ? new URLSearchParams(location.search).get('at') : null
+const lyricDemo = import.meta.env.DEV && new URLSearchParams(location.search).get('lyrics') === 'demo'
 const now = clockFrom(simulatedAt)
 const memory = ref<Memory>()
 const phase = ref<Phase>('loading')
@@ -25,6 +29,8 @@ const letterStatus = ref<'pending' | 'loaded' | 'error'>('pending')
 const imageFailed = ref(false)
 const playback = ref<Playback>({ status: 'idle', elapsed: 0, duration: 0, muted: false })
 const volume = ref(0.65)
+const lyrics = ref<LyricCue[]>([])
+const lyricsShown = ref(true)
 const posterSize = ref<PosterSize>('portrait')
 const posterCanvas = ref<HTMLCanvasElement>()
 const posterUrl = ref('')
@@ -33,6 +39,7 @@ const capture = ref(false)
 const heading = ref<HTMLElement>()
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)')
 const music = new Music(state => { playback.value = state })
+const lyricRequest = new AbortController()
 let clockTimer: number | undefined
 let sceneTimer: number | undefined
 let posterRevision = 0
@@ -116,6 +123,46 @@ function changeVolume(event: Event) {
   music.setVolume(volume.value)
 }
 
+function seekMusic(event: Event) {
+  music.seek(Number((event.target as HTMLInputElement).value))
+}
+
+async function readLrc(url: string) {
+  const response = await fetch(url, { signal: lyricRequest.signal })
+  if (!response.ok || response.headers.get('content-type')?.includes('text/html')) {
+    throw new Error('Lyrics unavailable')
+  }
+  return response.text()
+}
+
+async function requestLyrics() {
+  try {
+    let files: [string, string]
+    if (import.meta.env.DEV && lyricDemo) {
+      const [japanese, chinese] = await Promise.all([
+        import('./lyric-demo/japanese.lrc?raw'),
+        import('./lyric-demo/chinese.lrc?raw'),
+      ])
+      files = [japanese.default, chinese.default]
+    } else if (import.meta.env.DEV && localMusic) {
+      files = await Promise.all([
+        readLrc('/__local-document.ja.lrc'),
+        readLrc('/__local-document.zh.lrc'),
+      ])
+    } else {
+      const setting = memory.value?.music
+      const japanese = memoryAsset(setting?.lyrics?.japanese)
+      const chinese = memoryAsset(setting?.lyrics?.chinese)
+      if (!japanese || !chinese || !memoryAsset(setting?.src)) return
+      files = await Promise.all([readLrc(japanese), readLrc(chinese)])
+    }
+    const cues = parseBilingualLyrics(...files)
+    if (cues.some(({ japanese, chinese }) => japanese && chinese)) lyrics.value = cues
+  } catch {
+    // A missing or malformed LRC never affects the playback or the letter.
+  }
+}
+
 function requestLetter() {
   letterStatus.value = 'pending'
   letterRequest = loadLetter().then(sections => {
@@ -129,7 +176,10 @@ function requestLetter() {
 
 function openLetter() {
   if (phase.value !== 'ready' || !memory.value) return
-  if (musicTrack.value) music.start(musicTrack.value)
+  if (musicTrack.value) {
+    music.start(musicTrack.value)
+    void requestLyrics()
+  }
   if (!letterRequest) requestLetter()
   if (!allowMotion()) {
     showChapter(0)
@@ -270,6 +320,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  lyricRequest.abort()
   clearInterval(clockTimer)
   clearTimeout(sceneTimer)
   posterRevision++
@@ -294,6 +345,8 @@ onUnmounted(() => {
         <div class="track-info">
           <span>{{ musicTrack.title }}</span>
           <span v-if="playback.duration" class="track-time" aria-label="音乐播放进度">{{ formatTime(playback.elapsed) }} / {{ formatTime(playback.duration) }}</span>
+          <input v-if="playback.duration" class="track-seek" type="range" min="0" step="0.1" :max="playback.duration" :value="playback.elapsed"
+                 aria-label="拖动音乐进度" :aria-valuetext="`${formatTime(playback.elapsed)} / ${formatTime(playback.duration)}`" @input="seekMusic">
         </div>
         <label class="volume">
           <span class="sr-only">音乐音量</span>
@@ -301,6 +354,9 @@ onUnmounted(() => {
         </label>
         <button type="button" class="music-button" @click="music.togglePlayback()">{{ playLabel }}</button>
         <button type="button" class="music-button mute-button" :aria-pressed="playback.muted" @click="music.toggleMute()">{{ playback.muted ? '取消静音' : '静音' }}</button>
+        <button v-if="lyrics.length && phase === 'reading'" type="button" class="music-button lyrics-toggle" :aria-pressed="lyricsShown" @click="lyricsShown = !lyricsShown">
+          {{ lyricDemo ? '示例字幕' : '歌词' }}
+        </button>
       </div>
     </header>
 
@@ -361,7 +417,7 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <section v-else-if="memory && chapter && phase === 'reading'" class="reading page-width" :style="chapterBackground">
+      <section v-else-if="memory && chapter && phase === 'reading'" class="reading page-width" :class="{ 'with-lyrics': lyrics.length }" :style="chapterBackground">
         <aside class="chapter-guide" aria-label="阅读目录">
           <p class="kicker">信件章节</p>
           <p class="chapter-count"><strong>{{ chapterNumber }}</strong> / {{ chapterTotal }}</p>
@@ -396,6 +452,8 @@ onUnmounted(() => {
             <button type="button" class="action" @click="chapterStep(1)">{{ chapterIndex === memory.chapters.length - 1 ? '读到落幕' : '下一章' }}</button>
           </nav>
         </article>
+        <AtmosphereLyrics v-if="lyrics.length" :cues="lyrics" :elapsed="playback.elapsed"
+                          :shown="lyricsShown && playback.status !== 'ended' && playback.status !== 'error'"/>
       </section>
 
       <section v-else-if="memory && phase === 'finale'" class="finale page-width">

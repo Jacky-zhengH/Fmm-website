@@ -5,6 +5,17 @@ import { defineConfig, loadEnv } from 'vite'
 
 const localDocument = fileURLToPath(new URL('./local-media/document-web.mp3', import.meta.url))
 const localRoute = '/__local-document.mp3'
+const localFiles = new Map([
+  [localRoute, { path: localDocument, type: 'audio/mpeg' }],
+  ['/__local-document.ja.lrc', {
+    path: fileURLToPath(new URL('./local-media/document.ja.lrc', import.meta.url)),
+    type: 'text/plain; charset=utf-8',
+  }],
+  ['/__local-document.zh.lrc', {
+    path: fileURLToPath(new URL('./local-media/document.zh.lrc', import.meta.url)),
+    type: 'text/plain; charset=utf-8',
+  }],
+])
 
 export default defineConfig(({ mode, command, isPreview }) => {
   const { SITE_ORIGIN } = loadEnv(mode, '.', 'SITE_')
@@ -26,9 +37,12 @@ export default defineConfig(({ mode, command, isPreview }) => {
         apply: 'serve',
         configureServer(server) {
           server.middlewares.use((request, response, next) => {
-            if (request.url?.split('?')[0] !== localRoute) return next()
+            const file = localFiles.get(request.url?.split('?')[0] ?? '')
+            if (!file) return next()
             const remote = request.socket.remoteAddress
-            if (!localAudio || !remote || !['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(remote)) {
+            const host = request.headers.host ?? ''
+            if (!localAudio || !remote || !['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(remote) ||
+                !/^(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/i.test(host)) {
               response.writeHead(404).end()
               return
             }
@@ -36,7 +50,7 @@ export default defineConfig(({ mode, command, isPreview }) => {
               response.writeHead(405, { Allow: 'GET, HEAD' }).end()
               return
             }
-            const size = statSync(localDocument, { throwIfNoEntry: false })?.size
+            const size = statSync(file.path, { throwIfNoEntry: false })?.size
             if (!size) {
               response.writeHead(404).end()
               return
@@ -49,7 +63,7 @@ export default defineConfig(({ mode, command, isPreview }) => {
               response.writeHead(416, { 'Content-Range': `bytes */${size}` }).end()
               return
             }
-            response.setHeader('Content-Type', 'audio/mpeg')
+            response.setHeader('Content-Type', file.type)
             response.setHeader('Accept-Ranges', 'bytes')
             response.setHeader('Cache-Control', 'no-store')
             response.setHeader('Cross-Origin-Resource-Policy', 'same-origin')
@@ -60,7 +74,7 @@ export default defineConfig(({ mode, command, isPreview }) => {
               response.end()
               return
             }
-            const stream = createReadStream(localDocument, { start, end })
+            const stream = createReadStream(file.path, { start, end })
             stream.on('error', () => response.destroy())
             response.on('close', () => stream.destroy())
             stream.pipe(response)
