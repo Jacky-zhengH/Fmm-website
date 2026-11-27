@@ -14,11 +14,11 @@ import type { PosterSize } from './poster'
 type Phase = 'loading' | 'waiting' | 'arriving' | 'ready' | 'opening' | 'reading' | 'finale' | 'poster' | 'error'
 
 declare const __LOCAL_DOCUMENT_AUDIO__: string
+declare const __INTERNAL_REVIEW__: boolean
 const archive = location.pathname === '/' || location.pathname === '/index.html'
 const isDevelopment = import.meta.env.DEV
 const localMusic = isDevelopment && typeof __LOCAL_DOCUMENT_AUDIO__ !== 'undefined' ? __LOCAL_DOCUMENT_AUDIO__ : ''
 const simulatedAt = isDevelopment ? new URLSearchParams(location.search).get('at') : null
-const lyricDemo = import.meta.env.DEV && new URLSearchParams(location.search).get('lyrics') === 'demo'
 const now = clockFrom(simulatedAt)
 const memory = ref<Memory>()
 const phase = ref<Phase>('loading')
@@ -139,13 +139,7 @@ async function readLrc(url: string) {
 async function requestLyrics() {
   try {
     let files: [string, string]
-    if (import.meta.env.DEV && lyricDemo) {
-      const [japanese, chinese] = await Promise.all([
-        import('./lyric-demo/japanese.lrc?raw'),
-        import('./lyric-demo/chinese.lrc?raw'),
-      ])
-      files = [japanese.default, chinese.default]
-    } else if (import.meta.env.DEV && localMusic) {
+    if (import.meta.env.DEV && localMusic) {
       files = await Promise.all([
         readLrc('/__local-document.ja.lrc'),
         readLrc('/__local-document.zh.lrc'),
@@ -308,7 +302,7 @@ onMounted(async () => {
   try {
     memory.value = await loadMemory()
     if (archive) return
-    if (now() < Date.parse(memory.value.unlockAt)) {
+    if (!__INTERNAL_REVIEW__ && now() < Date.parse(memory.value.unlockAt)) {
       phase.value = 'waiting'
       updateClock()
       if (phase.value === 'waiting') clockTimer = window.setInterval(updateClock, 200)
@@ -356,7 +350,7 @@ onUnmounted(() => {
         <button type="button" class="music-button" @click="music.togglePlayback()">{{ playLabel }}</button>
         <button type="button" class="music-button mute-button" :aria-pressed="playback.muted" @click="music.toggleMute()">{{ playback.muted ? '取消静音' : '静音' }}</button>
         <button v-if="lyrics.length && phase === 'reading'" type="button" class="music-button lyrics-toggle" :aria-pressed="lyricsShown" @click="lyricsShown = !lyricsShown">
-          {{ lyricDemo ? '示例字幕' : '歌词' }}
+          歌词
         </button>
       </div>
     </header>
@@ -488,7 +482,6 @@ onUnmounted(() => {
     <footer v-if="!capture" class="site-footer page-width">
       <span>{{ archive ? '纪念档案' : (memory?.title || '深夜来信') }}</span>
       <span v-if="musicNotice" class="current-track" role="status">{{ musicNotice }}</span>
-      <span v-else-if="simulatedAt" class="current-track">本地时间模拟</span>
       <span>{{ memory?.displayDate || 'Midnight Letters' }}<span v-if="!archive"> · CST</span></span>
     </footer>
   </div>

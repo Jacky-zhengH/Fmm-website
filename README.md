@@ -52,7 +52,7 @@ npm run dev
 
 把用户提供的 UTF-8 LRC 放到 `local-media/document.ja.lrc` 和 `local-media/document.zh.lrc`。两份文件用相同的时间戳（例如 `[00:12.34]`）配对。在器乐段起点写一行只有时间戳的记录即可清屏；一条字幕最多保留 8 秒。两份歌词均可加载时，阅读页播放器才显示歌词开关。
 
-[本机示例字幕预览](http://127.0.0.1:5173/memories/nemu-200/?at=2026-11-28T00%3A00%3A01%2B08%3A00&lyrics=demo)使用自写的双语短句。点击拆信后可拖动至 0:06 检查当前句，或拖动至 0:15 检查器乐留白。示例字幕仅在开发预览中加载。本机 LRC 与音频一起排除在 Git 和构建产物之外。具备发布条件后，可将两份 LRC 放入活动公开资源目录，并在 `music.lyrics.japanese`、`music.lyrics.chinese` 设置相对路径。
+本机 LRC 与音频一起排除在 Git 和构建产物之外。具备发布条件后，可将两份 LRC 放入活动公开资源目录，并在 `music.lyrics.japanese`、`music.lyrics.chinese` 设置相对路径。
 
 建议默读版正文保留 **800–900 个汉字**，标题和歌词另计。按每分钟 230 字的编排节奏估算，正文约占 3:29–3:55，在 4:44.814 的配乐里留约 50–76 秒给插图、偶尔抬眼看字幕和落幕。宽屏把正文与插图并排，窄屏上下排列。纸张底部可翻页，电脑也可用方向键左右翻章，较长的正文可以自然滚动。
 
@@ -64,6 +64,6 @@ npm run dev
 2. 选择 Vue/Vite，Production branch 填 `main`，Build command 填 `npm run build`，Build output directory 填 `dist`，Root directory 留空。`.node-version` 选择 Node.js 22 LTS。需要手动指定时，设置 `NODE_VERSION=22`。[Cloudflare 构建环境](https://developers.cloudflare.com/pages/configuration/build-image/)
 3. 确定 `pages.dev` 域名后，将其 HTTPS 来源设为构建环境变量 `SITE_ORIGIN`（无需尾部斜线），再部署以生成绝对分享图片地址。部署后检查两条路由及刷新、分享卡片、手机播放和海报保存，并用中国大陆网络验证访问。发送给收信人的链接使用 `/memories/nemu-200/`。
 
-Cloudflare 分支预览的链接默认可公开访问。需要在线审阅草稿时，可在预览设置里启用 Cloudflare Access，并在提交正式内容前验证访问限制。[Cloudflare 预览访问设置](https://developers.cloudflare.com/pages/configuration/preview-deployments/#customize-preview-deployments-access)
+内测分支固定为 `codex/internal-review`。Cloudflare Pages 构建注入的 `CF_PAGES_BRANCH` 与分支完全一致时，预览域名下的 `/memories/nemu-200/` 直接进入已解封的信封，沿用正式的拆信、阅读和海报流程。搭建分支预览前在 Cloudflare Pages 启用 Access 并核实未登录访客会被拦截。本机可在运行 `npm run build` 前将 `CF_PAGES_BRANCH` 设为该分支值，构建后清除该变量，再用 `npm run preview` 查看产物。[Cloudflare 预览访问设置](https://developers.cloudflare.com/pages/configuration/preview-deployments/#customize-preview-deployments-access)
 
 两个 HTML 和 Cloudflare 的 `_headers` 都声明了 `noindex`。纯前端时间锁依赖访客设备时间。静态托管会公开 `letter.md` 和其他资源，知道路径的人在解封前也能请求。若正文必须等到零点才可获取，请先留在本地，待零点后发布正文或另行确认服务端方案。
