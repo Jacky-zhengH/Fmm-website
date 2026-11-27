@@ -21,9 +21,13 @@ export default defineConfig(({ mode, command, isPreview }) => {
   const { SITE_ORIGIN } = loadEnv(mode, '.', 'SITE_')
   const origin = SITE_ORIGIN ? new URL(SITE_ORIGIN).origin : ''
   const localAudio = command === 'serve' && !isPreview && statSync(localDocument, { throwIfNoEntry: false })?.isFile()
+  const internalReview = command === 'build' && process.env.CF_PAGES_BRANCH === 'codex/internal-review'
 
   return {
-    define: { __LOCAL_DOCUMENT_AUDIO__: JSON.stringify(localAudio ? localRoute : '') },
+    define: {
+      __LOCAL_DOCUMENT_AUDIO__: JSON.stringify(localAudio ? localRoute : ''),
+      __INTERNAL_REVIEW__: JSON.stringify(internalReview),
+    },
     plugins: [
       vue(),
       {

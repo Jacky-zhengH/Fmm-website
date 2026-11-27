@@ -152,6 +152,7 @@ button.envelope-button:hover .envelope, button.envelope-button:focus-visible .en
 .finale-message { margin: 0; line-height: 1.9; font: 1.15rem/1.8 var(--serif); }
 .finale-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 0.4rem 1.5rem; margin-top: 1.9rem; }
 .poster-page { display: grid; grid-template-columns: minmax(13rem, 0.57fr) minmax(0, 1fr); align-items: center; justify-content: center; gap: clamp(1rem, 5vw, 4rem); padding-block: clamp(1.65rem, 5vh, 4rem); }
+.poster-sidebar > .lyric-atmosphere { position: relative; top: auto; }
 .poster-controls { display: grid; justify-items: start; gap: 0.45rem; }
 .poster-controls h1 { font-size: clamp(2rem, 5vw, 3.6rem); margin-bottom: 0.45em; }
 .poster-controls label { color: var(--muted); font-size: 0.88rem; }

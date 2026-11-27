@@ -14,11 +14,11 @@ import type { PosterSize } from './poster'
 type Phase = 'loading' | 'waiting' | 'arriving' | 'ready' | 'opening' | 'reading' | 'finale' | 'poster' | 'error'
 
 declare const __LOCAL_DOCUMENT_AUDIO__: string
+declare const __INTERNAL_REVIEW__: boolean
 const archive = location.pathname === '/' || location.pathname === '/index.html'
 const isDevelopment = import.meta.env.DEV
 const localMusic = isDevelopment && typeof __LOCAL_DOCUMENT_AUDIO__ !== 'undefined' ? __LOCAL_DOCUMENT_AUDIO__ : ''
 const simulatedAt = isDevelopment ? new URLSearchParams(location.search).get('at') : null
-const lyricDemo = import.meta.env.DEV && new URLSearchParams(location.search).get('lyrics') === 'demo'
 const now = clockFrom(simulatedAt)
 const memory = ref<Memory>()
 const phase = ref<Phase>('loading')
@@ -32,6 +32,7 @@ const volume = ref(0.65)
 const lyrics = ref<LyricCue[]>([])
 const lyricsShown = ref(true)
 const lyricsEnabled = computed(() => lyrics.value.length > 0 && lyricsShown.value)
+const lyricsActive = computed(() => playback.value.status !== 'ended' && playback.value.status !== 'error')
 const posterSize = ref<PosterSize>('portrait')
 const posterCanvas = ref<HTMLCanvasElement>()
 const posterUrl = ref('')
@@ -139,13 +140,7 @@ async function readLrc(url: string) {
 async function requestLyrics() {
   try {
     let files: [string, string]
-    if (import.meta.env.DEV && lyricDemo) {
-      const [japanese, chinese] = await Promise.all([
-        import('./lyric-demo/japanese.lrc?raw'),
-        import('./lyric-demo/chinese.lrc?raw'),
-      ])
-      files = [japanese.default, chinese.default]
-    } else if (import.meta.env.DEV && localMusic) {
+    if (import.meta.env.DEV && localMusic) {
       files = await Promise.all([
         readLrc('/__local-document.ja.lrc'),
         readLrc('/__local-document.zh.lrc'),
@@ -308,7 +303,7 @@ onMounted(async () => {
   try {
     memory.value = await loadMemory()
     if (archive) return
-    if (now() < Date.parse(memory.value.unlockAt)) {
+    if (!__INTERNAL_REVIEW__ && now() < Date.parse(memory.value.unlockAt)) {
       phase.value = 'waiting'
       updateClock()
       if (phase.value === 'waiting') clockTimer = window.setInterval(updateClock, 200)
@@ -355,8 +350,8 @@ onUnmounted(() => {
         </label>
         <button type="button" class="music-button" @click="music.togglePlayback()">{{ playLabel }}</button>
         <button type="button" class="music-button mute-button" :aria-pressed="playback.muted" @click="music.toggleMute()">{{ playback.muted ? '取消静音' : '静音' }}</button>
-        <button v-if="lyrics.length && phase === 'reading'" type="button" class="music-button lyrics-toggle" :aria-pressed="lyricsShown" @click="lyricsShown = !lyricsShown">
-          {{ lyricDemo ? '示例字幕' : '歌词' }}
+        <button v-if="lyrics.length && (phase === 'reading' || phase === 'poster')" type="button" class="music-button lyrics-toggle" :aria-pressed="lyricsShown" @click="lyricsShown = !lyricsShown">
+          歌词
         </button>
       </div>
     </header>
@@ -446,7 +441,7 @@ onUnmounted(() => {
           </nav>
         </article>
         <AtmosphereLyrics v-if="lyricsEnabled" :cues="lyrics" :elapsed="playback.elapsed"
-                          :shown="playback.status !== 'ended' && playback.status !== 'error'"/>
+                          :shown="lyricsActive"/>
       </section>
 
       <section v-else-if="memory && phase === 'finale'" class="finale page-width">
@@ -460,18 +455,22 @@ onUnmounted(() => {
       </section>
 
       <section v-else-if="memory && phase === 'poster'" class="poster-page page-width" :class="{ 'landscape-poster': posterSize === 'landscape' }">
-        <div v-if="!capture" class="poster-controls">
-          <p class="kicker">{{ memory.title }}</p>
-          <h1 ref="heading" tabindex="-1">纪念海报</h1>
-          <label for="poster-size">海报尺寸</label>
-          <select id="poster-size" v-model="posterSize" @change="drawPoster">
-            <option v-for="(size, key) in posterSizes" :key="key" :value="key">{{ size.label }} · {{ size.width }} × {{ size.height }}</option>
-          </select>
-          <a v-if="posterUrl" class="action" :href="posterUrl" :download="`nemu-200-${posterSize}.png`">保存 PNG</a>
-          <a v-if="posterUrl" class="text-action" :href="posterUrl" target="_blank" rel="noopener">打开原图</a>
-          <button type="button" class="text-action" @click="setCapture(true)">纯净截图模式</button>
-          <button type="button" class="text-action back-to-finale" @click="showFinale">返回落幕</button>
-          <p v-if="posterFailed" role="status" class="hint">PNG 暂时无法生成，可使用截图模式。</p>
+        <div v-if="!capture" class="poster-sidebar">
+          <div class="poster-controls">
+            <p class="kicker">{{ memory.title }}</p>
+            <h1 ref="heading" tabindex="-1">纪念海报</h1>
+            <label for="poster-size">海报尺寸</label>
+            <select id="poster-size" v-model="posterSize" @change="drawPoster">
+              <option v-for="(size, key) in posterSizes" :key="key" :value="key">{{ size.label }} · {{ size.width }} × {{ size.height }}</option>
+            </select>
+            <a v-if="posterUrl" class="action" :href="posterUrl" :download="`nemu-200-${posterSize}.png`">保存 PNG</a>
+            <a v-if="posterUrl" class="text-action" :href="posterUrl" target="_blank" rel="noopener">打开原图</a>
+            <button type="button" class="text-action" @click="setCapture(true)">纯净截图模式</button>
+            <button type="button" class="text-action back-to-finale" @click="showFinale">返回落幕</button>
+            <p v-if="posterFailed" role="status" class="hint">PNG 暂时无法生成，可使用截图模式。</p>
+          </div>
+          <AtmosphereLyrics v-if="lyricsEnabled" :cues="lyrics" :elapsed="playback.elapsed"
+                            :shown="lyricsActive"/>
         </div>
         <figure class="poster-sheet">
           <canvas ref="posterCanvas" role="img" :aria-label="`${memory.recipient} ${memory.days} 天纪念海报`">{{ memory.recipient }} · {{ memory.days }} DAYS · {{ memory.displayDate }}</canvas>
@@ -488,7 +487,6 @@ onUnmounted(() => {
     <footer v-if="!capture" class="site-footer page-width">
       <span>{{ archive ? '纪念档案' : (memory?.title || '深夜来信') }}</span>
       <span v-if="musicNotice" class="current-track" role="status">{{ musicNotice }}</span>
-      <span v-else-if="simulatedAt" class="current-track">本地时间模拟</span>
       <span>{{ memory?.displayDate || 'Midnight Letters' }}<span v-if="!archive"> · CST</span></span>
     </footer>
   </div>

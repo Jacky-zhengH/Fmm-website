@@ -10,12 +10,8 @@
   "draft": true,
   "music": {
     "title": "サカナクション · ドキュメント",
+    "src": "music/document-web.mp3",
     "volume": 0.75,
-    "fallback": {
-      "src": "music/demo-dawn.mp3",
-      "title": "天光之前（试听）",
-      "volume": 0.65
-    },
     "cues": [
       { "at": 12, "tone": "dawn" },
       { "at": 112, "tone": "clear" },
