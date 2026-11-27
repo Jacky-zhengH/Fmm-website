@@ -27,13 +27,13 @@ npm run dev
 | `letter.md` | 用 `## 章节名` 划分各章，段落之间空一行。标题须与配置中的 `title` 一致。 |
 | `config.json` | 编辑 `recipient`、`days`、`unlockAt`、`displayDate`、`subtitle`、`signature`、章节顺序、音乐及海报。`unlockAt` 保持带时区的 ISO 时间。正式内容齐备后将 `draft` 改为 `false`。 |
 | `images/` | 放 Fmm 立绘、截图和图像。推荐透明 PNG 或 WebP。章节可选 `image`、`imageAlt`、`background`。图片路径如 `images/portrait.webp`，背景也可填 CSS 颜色。 |
-| `music/` | 放可随网站公开发布的音频。当前生产构建使用一首原创试听曲。 |
+| `music/` | 存放网站使用的音频。当前使用《ドキュメント》的 192 kbps 网页 MP3。 |
 
-活动级 `music` 配置一首曲目，`title` 为曲名，`volume` 是 0–1 的初始增益，`fallback` 为本机曲目缺失时和生产环境使用的试听曲。将来具备公开发布条件时，可在 `music.src` 设置活动目录内的相对路径。`music.cues` 按播放秒数切换环境色，章节的 `enter` 可填 `fade` 或 `rise`，`exit` 可填 `fade`，`animations` 可关闭活动过场。海报的 `poster` 可配置 `message`、`accent` 和可选的 `artwork`。
+活动级 `music` 配置一首曲目，`title` 为曲名，`volume` 是 0–1 的初始增益，`music.src` 是活动目录内的相对路径。`music.cues` 按播放秒数切换环境色，章节的 `enter` 可填 `fade` 或 `rise`，`exit` 可填 `fade`，`animations` 可关闭活动过场。海报的 `poster` 可配置 `message`、`accent` 和可选的 `artwork`。
 
-## 《ドキュメント》本机配乐
+## 《ドキュメント》配乐
 
-`local-media/document-original.flac` 保留 44.1 kHz、16 bit 双声道原件（31,947,810 字节）。`local-media/document-web.mp3` 是 44.1 kHz、192 kbps 双声道预览转码（6,837,437 字节）。FFprobe 实测约 4 分 44.814 秒。源文件在最后约 0.3 秒的近静音区有解码告警，导出的 MP3 可完整解码。此目录由 Git 忽略并排除在站点构建之外。启动 Vite 后只在本机开发预览载入该 MP3。生产构建仍使用试听曲。
+`local-media/document-original.flac` 保留 44.1 kHz、16 bit 双声道原件（31,947,810 字节）。FFprobe 实测约 4 分 44.814 秒。源文件在最后约 0.3 秒的近静音区有解码告警。网站使用可完整解码的 44.1 kHz、192 kbps 双声道转码（6,837,437 字节），发布文件为 `public/memories/nemu-200/music/document-web.mp3`。Vite 优先使用忽略目录中的同名本机 MP3，便于同时使用本机歌词预览。
 
 拆信启动音乐，翻页、落幕和进入海报沿用同一个播放进度。早读完可以留在海报页继续听。读得更久时，歌曲自然结束，读者可选择重播。播放器提供进度拖动、静音、暂停、继续和音量调节。
 
@@ -50,9 +50,11 @@ npm run dev
 
 ### 双语字幕与正文长度
 
-把用户提供的 UTF-8 LRC 放到 `local-media/document.ja.lrc` 和 `local-media/document.zh.lrc`。两份文件用相同的时间戳（例如 `[00:12.34]`）配对。在器乐段起点写一行只有时间戳的记录即可清屏；一条字幕最多保留 8 秒。两份歌词均可加载时，阅读页播放器才显示歌词开关。
+把取得使用许可的 UTF-8 LRC 放到 `local-media/document.ja.lrc` 和 `local-media/document.zh.lrc`。两份文件用相同的时间戳（例如 `[00:12.34]`）配对。有整曲偏移时，在日语 LRC 写入 `[offset:+250]` 可让字幕提前 250 毫秒，负值用于延后。中文文件省略 `offset` 时沿用日语偏移。若两个文件都注明偏移，按调整后的时间配对。在器乐段起点给日语 LRC 加一行只有时间戳的记录即可清屏。每句最多保留 8 秒。
 
-本机 LRC 与音频一起排除在 Git 和构建产物之外。具备发布条件后，可将两份 LRC 放入活动公开资源目录，并在 `music.lyrics.japanese`、`music.lyrics.chinese` 设置相对路径。
+读取到配对歌词后，阅读和海报页面的播放器会显示歌词开关。电脑端同时呈现前一句、当前句和后一句，手机端只显示当前句。海报旁的字幕继续跟随歌曲进度，导出的 PNG 只包含海报画布。缺失歌词时自动隐藏字幕和开关。
+
+`local-media/` 排除在 Git 和构建产物之外。将两份可发布的 LRC 放入活动资源目录后，在 `music.lyrics.japanese`、`music.lyrics.chinese` 设置相对路径即可随网站使用。
 
 建议默读版正文保留 **800–900 个汉字**，标题和歌词另计。按每分钟 230 字的编排节奏估算，正文约占 3:29–3:55，在 4:44.814 的配乐里留约 50–76 秒给插图、偶尔抬眼看字幕和落幕。宽屏把正文与插图并排，窄屏上下排列。纸张底部可翻页，电脑也可用方向键左右翻章，较长的正文可以自然滚动。
 
@@ -60,7 +62,7 @@ npm run dev
 
 静态页面可用 Cloudflare Pages 免费方案构建和托管。原型先在本机审看，正式发布前确认正文、图片、落款、可公开播放的音乐与解封保密要求。[Cloudflare Pages 免费方案限制](https://developers.cloudflare.com/pages/platform/limits/)
 
-1. 将验收后的源码推送到 GitHub 私有仓库。Cloudflare 控制台中打开 **Workers & Pages → Create application → Pages → Connect to Git**，授权 Cloudflare 访问 `Jacky-zhengH/Fmm-website`。Git 集成会在生产分支更新时构建。[Cloudflare Git 集成](https://developers.cloudflare.com/pages/get-started/git-integration/)
+1. 将可公开发布的源码推送到 GitHub 仓库。Cloudflare 控制台中打开 **Workers & Pages → Create application → Pages → Connect to Git**，授权 Cloudflare 访问 `Jacky-zhengH/Fmm-website`。Git 集成会在生产分支更新时构建。[Cloudflare Git 集成](https://developers.cloudflare.com/pages/get-started/git-integration/)
 2. 选择 Vue/Vite，Production branch 填 `main`，Build command 填 `npm run build`，Build output directory 填 `dist`，Root directory 留空。`.node-version` 选择 Node.js 22 LTS。需要手动指定时，设置 `NODE_VERSION=22`。[Cloudflare 构建环境](https://developers.cloudflare.com/pages/configuration/build-image/)
 3. 确定 `pages.dev` 域名后，将其 HTTPS 来源设为构建环境变量 `SITE_ORIGIN`（无需尾部斜线），再部署以生成绝对分享图片地址。部署后检查两条路由及刷新、分享卡片、手机播放和海报保存，并用中国大陆网络验证访问。发送给收信人的链接使用 `/memories/nemu-200/`。
 

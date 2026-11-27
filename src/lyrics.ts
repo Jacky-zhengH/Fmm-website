@@ -5,12 +5,19 @@ export interface LyricCue {
 }
 
 const timestamp = /^\[(\d{1,3}):([0-5]\d)(?:\.(\d{1,3}))?\]/
+const offsetTag = /^\[offset:\s*([+-]?\d{1,9})\s*\]$/i
 
 function parseLrc(source: string) {
   const lines = new Map<number, string>()
+  let offset: number | undefined
   for (const line of source.split(/\r\n?|\n/)) {
     const times: number[] = []
     let text = line.trim()
+    const adjustment = offsetTag.exec(text)
+    if (adjustment) {
+      offset = Number(adjustment[1])
+      continue
+    }
     let tag = timestamp.exec(text)
     while (tag) {
       const [, minutes, seconds, fraction = ''] = tag
@@ -20,18 +27,22 @@ function parseLrc(source: string) {
     }
     for (const time of times) lines.set(time, text)
   }
-  return lines
+  return { lines, offset }
 }
 
 export function parseBilingualLyrics(japanese: string, chinese: string): LyricCue[] {
-  const translations = parseLrc(chinese)
-  return [...parseLrc(japanese)]
+  const { lines, offset = 0 } = parseLrc(japanese)
+  const { lines: translations, offset: translationOffset = offset } = parseLrc(chinese)
+  return [...lines]
     .sort(([first], [second]) => first - second)
-    .map(([time, text]) => ({
-      time: time / 1000,
-      japanese: text,
-      chinese: text ? translations.get(time) ?? '' : '',
-    }))
+    .map(([time, text]) => {
+      const playbackTime = time - offset
+      return {
+        time: playbackTime / 1000,
+        japanese: text,
+        chinese: text ? translations.get(playbackTime + translationOffset) ?? '' : '',
+      }
+    })
 }
 
 export function currentLyricIndex(cues: readonly LyricCue[], time: number): number {
