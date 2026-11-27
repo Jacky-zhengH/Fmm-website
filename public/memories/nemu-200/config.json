@@ -30,6 +30,8 @@
     {
       "id": "first-meeting",
       "title": "最初的相遇",
+      "image": "images/nemu-at-the-desk.webp",
+      "imageAlt": "暖黄色的窗光下，芙眠眠趴在摆着书本的桌前。",
       "music": {
         "src": "music/demo-dawn.mp3",
         "title": "天光之前（试听）",
@@ -41,6 +43,8 @@
     {
       "id": "memories",
       "title": "200 天里的回忆",
+      "image": "images/nemu-sakura-stairs.webp",
+      "imageAlt": "芙眠眠坐在樱花树下的木楼梯上。",
       "music": {
         "src": "music/demo-night.mp3",
         "title": "深夜频率（试听）",
@@ -59,7 +63,9 @@
     },
     {
       "id": "future",
-      "title": "写给未来的祝福"
+      "title": "写给未来的祝福",
+      "image": "images/nemu-with-sakura.webp",
+      "imageAlt": "深色背景里飘着发光的花瓣，芙眠眠手持一枝樱花。"
     }
   ]
 }
