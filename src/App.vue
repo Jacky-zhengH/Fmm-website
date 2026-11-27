@@ -1,17 +1,24 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import AtmosphereLyrics from './AtmosphereLyrics.vue'
 import { Music } from './audio'
+import type { Playback } from './audio'
 import { clockFrom, getCountdown } from './clock'
 import { loadLetter, loadMemory, memoryAsset, memoryPath, memoryTrack } from './content'
 import type { Memory } from './content'
+import { parseBilingualLyrics } from './lyrics'
+import type { LyricCue } from './lyrics'
 import { posterSizes, renderPoster } from './poster'
 import type { PosterSize } from './poster'
 
 type Phase = 'loading' | 'waiting' | 'arriving' | 'ready' | 'opening' | 'reading' | 'finale' | 'poster' | 'error'
 
+declare const __LOCAL_DOCUMENT_AUDIO__: string
 const archive = location.pathname === '/' || location.pathname === '/index.html'
 const isDevelopment = import.meta.env.DEV
+const localMusic = isDevelopment && typeof __LOCAL_DOCUMENT_AUDIO__ !== 'undefined' ? __LOCAL_DOCUMENT_AUDIO__ : ''
 const simulatedAt = isDevelopment ? new URLSearchParams(location.search).get('at') : null
+const lyricDemo = import.meta.env.DEV && new URLSearchParams(location.search).get('lyrics') === 'demo'
 const now = clockFrom(simulatedAt)
 const memory = ref<Memory>()
 const phase = ref<Phase>('loading')
@@ -20,9 +27,11 @@ const chapterIndex = ref(0)
 const letter = ref(new Map<string, string[]>())
 const letterStatus = ref<'pending' | 'loaded' | 'error'>('pending')
 const imageFailed = ref(false)
-const musicStatus = ref('音乐关闭')
-const musicOn = ref(false)
+const playback = ref<Playback>({ status: 'idle', elapsed: 0, duration: 0, muted: false })
 const volume = ref(0.65)
+const lyrics = ref<LyricCue[]>([])
+const lyricsShown = ref(true)
+const lyricsEnabled = computed(() => lyrics.value.length > 0 && lyricsShown.value)
 const posterSize = ref<PosterSize>('portrait')
 const posterCanvas = ref<HTMLCanvasElement>()
 const posterUrl = ref('')
@@ -30,17 +39,44 @@ const posterFailed = ref(false)
 const capture = ref(false)
 const heading = ref<HTMLElement>()
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)')
-const music = new Music(status => {
-  musicStatus.value = status
-  musicOn.value = music.enabled
-})
-let manuallyControlled = false
+const music = new Music(state => { playback.value = state })
+const lyricRequest = new AbortController()
 let clockTimer: number | undefined
 let sceneTimer: number | undefined
 let posterRevision = 0
 let letterRequest: Promise<void> | undefined
 
 const firstStage = computed(() => ['waiting', 'arriving', 'ready', 'opening'].includes(phase.value))
+const musicTrack = computed(() => {
+  const setting = memory.value?.music
+  if (!setting) return undefined
+  const mainSource = localMusic || memoryAsset(setting.src)
+  return mainSource
+    ? { src: mainSource, title: setting.title, volume: setting.volume, cues: setting.cues }
+    : memoryTrack(setting.fallback)
+})
+const musicCue = computed(() => {
+  if (memory.value?.animations === false) return undefined
+  const track = musicTrack.value
+  if (!track || !('cues' in track) || !Array.isArray(track.cues)) return undefined
+  return track.cues.reduce<(typeof track.cues)[number]['tone'] | undefined>(
+    (tone, cue) => playback.value.elapsed >= cue.at ? cue.tone : tone,
+    undefined,
+  )
+})
+const playLabel = computed(() => ({
+  idle: '播放音乐',
+  loading: '暂停音乐',
+  playing: '暂停音乐',
+  paused: '继续播放',
+  ended: '重播音乐',
+  error: '重试音乐',
+})[playback.value.status])
+const musicNotice = computed(() => {
+  if (playback.value.status === 'ended') return '音乐已结束，可继续阅读或手动重播。'
+  if (playback.value.status === 'error') return '音乐暂时无法播放，信件可继续阅读。'
+  return ''
+})
 const locked = computed(() => phase.value === 'waiting')
 const chapter = computed(() => memory.value?.chapters[chapterIndex.value])
 const paragraphs = computed(() => chapter.value ? letter.value.get(chapter.value.title) ?? [] : [])
@@ -78,15 +114,54 @@ function updateClock() {
   }
 }
 
-function toggleMusic() {
-  manuallyControlled = true
-  music.toggle()
-  musicOn.value = music.enabled
+function formatTime(seconds: number) {
+  const total = Math.floor(seconds)
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
 }
 
 function changeVolume(event: Event) {
   volume.value = Number((event.target as HTMLInputElement).value)
   music.setVolume(volume.value)
+}
+
+function seekMusic(event: Event) {
+  music.seek(Number((event.target as HTMLInputElement).value))
+}
+
+async function readLrc(url: string) {
+  const response = await fetch(url, { signal: lyricRequest.signal })
+  if (!response.ok || response.headers.get('content-type')?.includes('text/html')) {
+    throw new Error('Lyrics unavailable')
+  }
+  return response.text()
+}
+
+async function requestLyrics() {
+  try {
+    let files: [string, string]
+    if (import.meta.env.DEV && lyricDemo) {
+      const [japanese, chinese] = await Promise.all([
+        import('./lyric-demo/japanese.lrc?raw'),
+        import('./lyric-demo/chinese.lrc?raw'),
+      ])
+      files = [japanese.default, chinese.default]
+    } else if (import.meta.env.DEV && localMusic) {
+      files = await Promise.all([
+        readLrc('/__local-document.ja.lrc'),
+        readLrc('/__local-document.zh.lrc'),
+      ])
+    } else {
+      const setting = memory.value?.music
+      const japanese = memoryAsset(setting?.lyrics?.japanese)
+      const chinese = memoryAsset(setting?.lyrics?.chinese)
+      if (!japanese || !chinese || !memoryAsset(setting?.src)) return
+      files = await Promise.all([readLrc(japanese), readLrc(chinese)])
+    }
+    const cues = parseBilingualLyrics(...files)
+    if (cues.some(({ japanese, chinese }) => japanese && chinese)) lyrics.value = cues
+  } catch {
+    // A missing or malformed LRC never affects the playback or the letter.
+  }
 }
 
 function requestLetter() {
@@ -102,9 +177,10 @@ function requestLetter() {
 
 function openLetter() {
   if (phase.value !== 'ready' || !memory.value) return
-  music.setTrack(memoryTrack(memory.value.chapters[0]?.music))
-  if (!manuallyControlled) music.enable()
-  musicOn.value = music.enabled
+  if (musicTrack.value) {
+    music.start(musicTrack.value)
+    void requestLyrics()
+  }
   if (!letterRequest) requestLetter()
   if (!allowMotion()) {
     showChapter(0)
@@ -126,8 +202,6 @@ function showChapter(index: number) {
   chapterIndex.value = index
   imageFailed.value = false
   phase.value = 'reading'
-  music.setTrack(memoryTrack(memory.value.chapters[index]?.music))
-  music.prime(memoryTrack(memory.value.chapters[index + 1]?.music ?? memory.value.finaleMusic))
   focusScene()
 }
 
@@ -164,7 +238,6 @@ function showFinale() {
   if (posterUrl.value) URL.revokeObjectURL(posterUrl.value)
   posterUrl.value = ''
   phase.value = 'finale'
-  music.setTrack(memoryTrack(memory.value?.finaleMusic))
   focusScene()
 }
 
@@ -238,11 +311,9 @@ onMounted(async () => {
     if (now() < Date.parse(memory.value.unlockAt)) {
       phase.value = 'waiting'
       updateClock()
-      music.setTrack(memoryTrack(memory.value.waitingMusic))
       if (phase.value === 'waiting') clockTimer = window.setInterval(updateClock, 200)
     } else {
       phase.value = 'ready'
-      music.setTrack(memoryTrack(memory.value.waitingMusic ?? memory.value.chapters[0]?.music))
     }
   } catch {
     phase.value = 'error'
@@ -250,6 +321,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  lyricRequest.abort()
   clearInterval(clockTimer)
   clearTimeout(sceneTimer)
   posterRevision++
@@ -263,23 +335,29 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="site" :class="{ 'capture-mode': capture, 'still': memory?.animations === false }" :data-phase="phase">
+  <div class="site" :class="{ 'capture-mode': capture, 'still': memory?.animations === false }" :data-phase="phase" :data-music-cue="musicCue">
     <a v-if="!capture" class="skip" href="#content">跳至正文</a>
     <header v-if="!capture" class="masthead page-width">
       <a class="brand" href="/" aria-label="Midnight Letters 深夜来信，档案首页">
         <span class="brand-mark" aria-hidden="true"><i></i></span>
         <span>Midnight Letters<small>深夜来信</small></span>
       </a>
-      <div v-if="!archive && memory" class="audio-controls">
-        <label v-if="musicOn" class="volume">
+      <div v-if="musicTrack && ['opening', 'reading', 'finale', 'poster'].includes(phase)" class="audio-controls">
+        <div class="track-info">
+          <span>{{ musicTrack.title }}</span>
+          <span v-if="playback.duration" class="track-time" aria-label="音乐播放进度">{{ formatTime(playback.elapsed) }} / {{ formatTime(playback.duration) }}</span>
+          <input v-if="playback.duration" class="track-seek" type="range" min="0" step="0.1" :max="playback.duration" :value="playback.elapsed"
+                 aria-label="拖动音乐进度" :aria-valuetext="`${formatTime(playback.elapsed)} / ${formatTime(playback.duration)}`" @input="seekMusic">
+        </div>
+        <label class="volume">
           <span class="sr-only">音乐音量</span>
           <input type="range" min="0" max="1" step="0.05" :value="volume" @input="changeVolume">
         </label>
-        <button type="button" class="music-button" :aria-pressed="musicOn" :title="musicStatus" @click="toggleMusic">
-          <span class="equalizer" :class="{ playing: musicOn }" aria-hidden="true"><i></i><i></i><i></i></span>
-          {{ musicOn ? '关闭音乐' : '开启音乐' }}
+        <button type="button" class="music-button" @click="music.togglePlayback()">{{ playLabel }}</button>
+        <button type="button" class="music-button mute-button" :aria-pressed="playback.muted" @click="music.toggleMute()">{{ playback.muted ? '取消静音' : '静音' }}</button>
+        <button v-if="lyrics.length && phase === 'reading'" type="button" class="music-button lyrics-toggle" :aria-pressed="lyricsShown" @click="lyricsShown = !lyricsShown">
+          {{ lyricDemo ? '示例字幕' : '歌词' }}
         </button>
-        <span class="sr-only" role="status">{{ musicStatus }}</span>
       </div>
     </header>
 
@@ -315,7 +393,7 @@ onUnmounted(() => {
             <p v-if="phase === 'arriving'" class="arriving-note" role="status">封存时间已到</p>
             <template v-if="phase === 'ready'">
               <button class="action" type="button" @click="openLetter">拆开来信</button>
-              <p class="hint">{{ manuallyControlled && !musicOn ? '音乐已关闭' : '点击拆信即可播放章节配乐' }}</p>
+              <p v-if="musicTrack" class="hint">拆信后将播放配乐</p>
             </template>
             <button v-if="phase === 'opening'" class="text-action" type="button" @click="finishOpening">跳过动画</button>
           </div>
@@ -340,41 +418,35 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <section v-else-if="memory && chapter && phase === 'reading'" class="reading page-width" :style="chapterBackground">
-        <aside class="chapter-guide" aria-label="阅读目录">
-          <p class="kicker">信件章节</p>
-          <p class="chapter-count"><strong>{{ chapterNumber }}</strong> / {{ chapterTotal }}</p>
-          <ol>
-            <li v-for="(item, i) in memory.chapters" :key="item.id">
-              <button type="button" :aria-current="i === chapterIndex ? 'step' : undefined" @click="showChapter(i)">{{ item.title }}</button>
-            </li>
-          </ol>
-        </aside>
+      <section v-else-if="memory && chapter && phase === 'reading'" class="reading page-width" :class="{ 'with-lyrics': lyricsEnabled }" :style="chapterBackground">
         <article :key="chapter.id" class="letter-paper" :class="`chapter-enter-${chapter.enter || 'fade'}`">
           <header class="paper-head">
-            <p class="kicker">MIDNIGHT LETTERS <span>／</span> {{ chapterNumber }}</p>
             <h1 ref="heading" tabindex="-1">{{ chapter.title }}</h1>
             <p v-if="memory.draft" class="draft-note">试读版 · 正文待替换</p>
           </header>
-          <img v-if="image && !imageFailed" class="chapter-image" :src="image" :alt="chapter.imageAlt || ''" decoding="async" @error="imageFailed = true">
-          <div class="letter-text">
-            <p v-if="letterStatus === 'pending'" role="status">正在取出信纸…</p>
-            <div v-else-if="letterStatus === 'error'">
-              <p>来信暂时无法读取。</p>
-              <button type="button" class="text-action" @click="requestLetter">重新载入</button>
+          <div class="letter-content" :class="{ illustrated: image && !imageFailed }">
+            <div class="letter-text">
+              <p v-if="letterStatus === 'pending'" role="status">正在取出信纸…</p>
+              <div v-else-if="letterStatus === 'error'">
+                <p>来信暂时无法读取。</p>
+                <button type="button" class="text-action" @click="requestLetter">重新载入</button>
+              </div>
+              <template v-else>
+                <p v-for="(paragraph, i) in paragraphs" :key="i">{{ paragraph }}</p>
+                <p v-if="!paragraphs.length">这一章暂时留白。</p>
+              </template>
+              <p v-if="memory.signature && chapterIndex === memory.chapters.length - 1" class="signature">{{ memory.signature }}</p>
             </div>
-            <template v-else>
-              <p v-for="(paragraph, i) in paragraphs" :key="i">{{ paragraph }}</p>
-              <p v-if="!paragraphs.length">这一章暂时留白。</p>
-            </template>
-            <p v-if="memory.signature && chapterIndex === memory.chapters.length - 1" class="signature">{{ memory.signature }}</p>
+            <img v-if="image && !imageFailed" class="chapter-image" :src="image" :alt="chapter.imageAlt || ''" decoding="async" @error="imageFailed = true">
           </div>
           <nav class="letter-nav" aria-label="章节翻页">
             <button type="button" class="text-action" :disabled="chapterIndex === 0" @click="chapterStep(-1)">上一章</button>
-            <span>{{ chapterNumber }} / {{ chapterTotal }}</span>
+            <span :aria-label="`第 ${chapterIndex + 1} 章，共 ${memory.chapters.length} 章`">{{ chapterNumber }} / {{ chapterTotal }}</span>
             <button type="button" class="action" @click="chapterStep(1)">{{ chapterIndex === memory.chapters.length - 1 ? '读到落幕' : '下一章' }}</button>
           </nav>
         </article>
+        <AtmosphereLyrics v-if="lyricsEnabled" :cues="lyrics" :elapsed="playback.elapsed"
+                          :shown="playback.status !== 'ended' && playback.status !== 'error'"/>
       </section>
 
       <section v-else-if="memory && phase === 'finale'" class="finale page-width">
@@ -415,7 +487,7 @@ onUnmounted(() => {
 
     <footer v-if="!capture" class="site-footer page-width">
       <span>{{ archive ? '纪念档案' : (memory?.title || '深夜来信') }}</span>
-      <span v-if="!archive && musicStatus !== '音乐关闭'" class="current-track">{{ musicStatus }}</span>
+      <span v-if="musicNotice" class="current-track" role="status">{{ musicNotice }}</span>
       <span v-else-if="simulatedAt" class="current-track">本地时间模拟</span>
       <span>{{ memory?.displayDate || 'Midnight Letters' }}<span v-if="!archive"> · CST</span></span>
     </footer>

@@ -5,7 +5,6 @@ export const memoryPath = '/memories/nemu-200/'
 interface Chapter {
   id: string
   title: string
-  music?: Track
   image?: string
   imageAlt?: string
   background?: string
@@ -23,8 +22,12 @@ export interface Memory {
   signature?: string
   animations?: boolean
   draft?: boolean
-  waitingMusic?: Track
-  finaleMusic?: Track
+  music?: Omit<Track, 'src'> & {
+    src?: string
+    fallback?: Track
+    cues?: { at: number; tone: 'dawn' | 'clear' | 'tide' | 'tail' }[]
+    lyrics?: { japanese: string; chinese: string }
+  }
   poster?: { message?: string; accent?: string; artwork?: string }
   chapters: Chapter[]
 }

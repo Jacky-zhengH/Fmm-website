@@ -27,11 +27,34 @@ npm run dev
 | `letter.md` | 用 `## 章节名` 划分各章，段落之间空一行。标题须与配置中的 `title` 一致。 |
 | `config.json` | 编辑 `recipient`、`days`、`unlockAt`、`displayDate`、`subtitle`、`signature`、章节顺序、音乐及海报。`unlockAt` 保持带时区的 ISO 时间。正式内容齐备后将 `draft` 改为 `false`。 |
 | `images/` | 放 Fmm 立绘、截图和图像。推荐透明 PNG 或 WebP。章节可选 `image`、`imageAlt`、`background`。图片路径如 `images/portrait.webp`，背景也可填 CSS 颜色。 |
-| `music/` | 放获得公开传播许可的网页音乐。推荐 MP3（立体声 128–160 kbps）。目前使用两首原创合成试听循环。 |
+| `music/` | 放可随网站公开发布的音频。当前生产构建使用一首原创试听曲。 |
 
-`waitingMusic`、各章的 `music` 和 `finaleMusic` 使用同样的字段。`src` 为活动目录内的相对路径，`title` 用于播放器，`volume` 是 0–1，`start` 为起播秒数，`fade` 为淡化秒数，`loop` 控制循环。可删去音乐字段以停用该场景的音乐。章节的 `enter` 可填 `fade` 或 `rise`，`exit` 可填 `fade`，`animations` 可关闭活动过场。海报的 `poster` 可配置 `message`、`accent` 和可选的 `artwork`。
+活动级 `music` 配置一首曲目，`title` 为曲名，`volume` 是 0–1 的初始增益，`fallback` 为本机曲目缺失时和生产环境使用的试听曲。将来具备公开发布条件时，可在 `music.src` 设置活动目录内的相对路径。`music.cues` 按播放秒数切换环境色，章节的 `enter` 可填 `fade` 或 `rise`，`exit` 可填 `fade`，`animations` 可关闭活动过场。海报的 `poster` 可配置 `message`、`accent` 和可选的 `artwork`。
 
-原始音乐及本机试听文件放在 `local-media/`，Git 和站点构建会排除这个目录。附带的《ドキュメント》FLAC 约 31.95 MB，超过 Cloudflare Pages 的 25 MiB 单文件上限。本机已导出 `local-media/document-preview.mp3`（约 4.56 MB）供试听。原始 FLAC 转码时报告损坏帧，建议先试听检查，或用完好的源文件重新导出。网页配乐取得公开传播许可后再放入 `music/`。[Cloudflare Pages 限制](https://developers.cloudflare.com/pages/platform/limits/)
+## 《ドキュメント》本机配乐
+
+`local-media/document-original.flac` 保留 44.1 kHz、16 bit 双声道原件（31,947,810 字节）。`local-media/document-web.mp3` 是 44.1 kHz、192 kbps 双声道预览转码（6,837,437 字节）。FFprobe 实测约 4 分 44.814 秒。源文件在最后约 0.3 秒的近静音区有解码告警，导出的 MP3 可完整解码。此目录由 Git 忽略并排除在站点构建之外。启动 Vite 后只在本机开发预览载入该 MP3。生产构建仍使用试听曲。
+
+拆信启动音乐，翻页、落幕和进入海报沿用同一个播放进度。早读完可以留在海报页继续听。读得更久时，歌曲自然结束，读者可选择重播。播放器提供进度拖动、静音、暂停、继续和音量调节。
+
+下表用 FFmpeg 解码实际音源，按 8 秒窗测量波形 RMS 与频谱变化，并以频谱起音包络估算节奏。稳定脉冲约 160～162 次/分，也可按约 80 拍/分感受。边界为近似时间，供画面使用。
+
+| 时间 | 音源观测 | 视觉参考 |
+| --- | --- | --- |
+| 0:00–0:12 | 低能量开场，低频逐步出现，约 0:12 能量明显跃升 | 保持夜色，让暖光慢慢抬起 |
+| 0:12–1:52 | 节奏周期较稳定，能量多在 −11 至 −9 dBFS | 保持稳定环境光 |
+| 1:52–2:33 | 频谱变化加密，平均能量升至约 −8 dBFS，约 2:24–2:32 更强 | 环境色略亮 |
+| 2:33–3:15 | 平均能量回落，低频占比回升 | 降低环境亮度 |
+| 3:15–4:32 | 进入持续高能量段，频谱变化再次加密 | 逐步加深蓝金层次 |
+| 4:32–4:44.8 | 明显衰减，尾部趋近静音 | 若已打开落幕或海报，缓慢浮现柔和边光 |
+
+### 双语字幕与正文长度
+
+把用户提供的 UTF-8 LRC 放到 `local-media/document.ja.lrc` 和 `local-media/document.zh.lrc`。两份文件用相同的时间戳（例如 `[00:12.34]`）配对。在器乐段起点写一行只有时间戳的记录即可清屏；一条字幕最多保留 8 秒。两份歌词均可加载时，阅读页播放器才显示歌词开关。
+
+[本机示例字幕预览](http://127.0.0.1:5173/memories/nemu-200/?at=2026-11-28T00%3A00%3A01%2B08%3A00&lyrics=demo)使用自写的双语短句。点击拆信后可拖动至 0:06 检查当前句，或拖动至 0:15 检查器乐留白。示例字幕仅在开发预览中加载。本机 LRC 与音频一起排除在 Git 和构建产物之外。具备发布条件后，可将两份 LRC 放入活动公开资源目录，并在 `music.lyrics.japanese`、`music.lyrics.chinese` 设置相对路径。
+
+建议默读版正文保留 **800–900 个汉字**，标题和歌词另计。按每分钟 230 字的编排节奏估算，正文约占 3:29–3:55，在 4:44.814 的配乐里留约 50–76 秒给插图、偶尔抬眼看字幕和落幕。宽屏把正文与插图并排，窄屏上下排列。纸张底部可翻页，电脑也可用方向键左右翻章，较长的正文可以自然滚动。
 
 ## Cloudflare Pages
 
