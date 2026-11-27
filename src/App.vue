@@ -31,6 +31,7 @@ const playback = ref<Playback>({ status: 'idle', elapsed: 0, duration: 0, muted:
 const volume = ref(0.65)
 const lyrics = ref<LyricCue[]>([])
 const lyricsShown = ref(true)
+const lyricsEnabled = computed(() => lyrics.value.length > 0 && lyricsShown.value)
 const posterSize = ref<PosterSize>('portrait')
 const posterCanvas = ref<HTMLCanvasElement>()
 const posterUrl = ref('')
@@ -417,43 +418,35 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <section v-else-if="memory && chapter && phase === 'reading'" class="reading page-width" :class="{ 'with-lyrics': lyrics.length }" :style="chapterBackground">
-        <aside class="chapter-guide" aria-label="阅读目录">
-          <p class="kicker">信件章节</p>
-          <p class="chapter-count"><strong>{{ chapterNumber }}</strong> / {{ chapterTotal }}</p>
-          <ol>
-            <li v-for="(item, i) in memory.chapters" :key="item.id">
-              <button type="button" :aria-current="i === chapterIndex ? 'step' : undefined" @click="showChapter(i)">{{ item.title }}</button>
-            </li>
-          </ol>
-        </aside>
+      <section v-else-if="memory && chapter && phase === 'reading'" class="reading page-width" :class="{ 'with-lyrics': lyricsEnabled }" :style="chapterBackground">
         <article :key="chapter.id" class="letter-paper" :class="`chapter-enter-${chapter.enter || 'fade'}`">
           <header class="paper-head">
-            <p class="kicker">MIDNIGHT LETTERS <span>／</span> {{ chapterNumber }}</p>
             <h1 ref="heading" tabindex="-1">{{ chapter.title }}</h1>
             <p v-if="memory.draft" class="draft-note">试读版 · 正文待替换</p>
           </header>
-          <img v-if="image && !imageFailed" class="chapter-image" :src="image" :alt="chapter.imageAlt || ''" decoding="async" @error="imageFailed = true">
-          <div class="letter-text">
-            <p v-if="letterStatus === 'pending'" role="status">正在取出信纸…</p>
-            <div v-else-if="letterStatus === 'error'">
-              <p>来信暂时无法读取。</p>
-              <button type="button" class="text-action" @click="requestLetter">重新载入</button>
+          <div class="letter-content" :class="{ illustrated: image && !imageFailed }">
+            <div class="letter-text">
+              <p v-if="letterStatus === 'pending'" role="status">正在取出信纸…</p>
+              <div v-else-if="letterStatus === 'error'">
+                <p>来信暂时无法读取。</p>
+                <button type="button" class="text-action" @click="requestLetter">重新载入</button>
+              </div>
+              <template v-else>
+                <p v-for="(paragraph, i) in paragraphs" :key="i">{{ paragraph }}</p>
+                <p v-if="!paragraphs.length">这一章暂时留白。</p>
+              </template>
+              <p v-if="memory.signature && chapterIndex === memory.chapters.length - 1" class="signature">{{ memory.signature }}</p>
             </div>
-            <template v-else>
-              <p v-for="(paragraph, i) in paragraphs" :key="i">{{ paragraph }}</p>
-              <p v-if="!paragraphs.length">这一章暂时留白。</p>
-            </template>
-            <p v-if="memory.signature && chapterIndex === memory.chapters.length - 1" class="signature">{{ memory.signature }}</p>
+            <img v-if="image && !imageFailed" class="chapter-image" :src="image" :alt="chapter.imageAlt || ''" decoding="async" @error="imageFailed = true">
           </div>
           <nav class="letter-nav" aria-label="章节翻页">
             <button type="button" class="text-action" :disabled="chapterIndex === 0" @click="chapterStep(-1)">上一章</button>
-            <span>{{ chapterNumber }} / {{ chapterTotal }}</span>
+            <span :aria-label="`第 ${chapterIndex + 1} 章，共 ${memory.chapters.length} 章`">{{ chapterNumber }} / {{ chapterTotal }}</span>
             <button type="button" class="action" @click="chapterStep(1)">{{ chapterIndex === memory.chapters.length - 1 ? '读到落幕' : '下一章' }}</button>
           </nav>
         </article>
-        <AtmosphereLyrics v-if="lyrics.length" :cues="lyrics" :elapsed="playback.elapsed"
-                          :shown="lyricsShown && playback.status !== 'ended' && playback.status !== 'error'"/>
+        <AtmosphereLyrics v-if="lyricsEnabled" :cues="lyrics" :elapsed="playback.elapsed"
+                          :shown="playback.status !== 'ended' && playback.status !== 'error'"/>
       </section>
 
       <section v-else-if="memory && phase === 'finale'" class="finale page-width">
