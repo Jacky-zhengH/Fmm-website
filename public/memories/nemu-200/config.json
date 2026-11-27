@@ -8,19 +8,21 @@
   "signature": "",
   "animations": true,
   "draft": true,
-  "waitingMusic": {
-    "src": "music/demo-night.mp3",
-    "title": "深夜频率（试听）",
-    "volume": 0.48,
-    "loop": true,
-    "fade": 2.5
-  },
-  "finaleMusic": {
-    "src": "music/demo-dawn.mp3",
-    "title": "天光之前（试听）",
-    "volume": 0.48,
-    "loop": true,
-    "fade": 2.5
+  "music": {
+    "title": "サカナクション · ドキュメント",
+    "volume": 0.75,
+    "fallback": {
+      "src": "music/demo-dawn.mp3",
+      "title": "天光之前（试听）",
+      "volume": 0.65
+    },
+    "cues": [
+      { "at": 12, "tone": "dawn" },
+      { "at": 112, "tone": "clear" },
+      { "at": 153, "tone": "dawn" },
+      { "at": 195, "tone": "tide" },
+      { "at": 272, "tone": "tail" }
+    ]
   },
   "poster": {
     "message": "",
@@ -31,27 +33,13 @@
       "id": "first-meeting",
       "title": "最初的相遇",
       "image": "images/nemu-at-the-desk.webp",
-      "imageAlt": "暖黄色的窗光下，芙眠眠趴在摆着书本的桌前。",
-      "music": {
-        "src": "music/demo-dawn.mp3",
-        "title": "天光之前（试听）",
-        "volume": 0.48,
-        "loop": true,
-        "fade": 2.5
-      }
+      "imageAlt": "暖黄色的窗光下，芙眠眠趴在摆着书本的桌前。"
     },
     {
       "id": "memories",
       "title": "200 天里的回忆",
       "image": "images/nemu-sakura-stairs.webp",
-      "imageAlt": "芙眠眠坐在樱花树下的木楼梯上。",
-      "music": {
-        "src": "music/demo-night.mp3",
-        "title": "深夜频率（试听）",
-        "volume": 0.48,
-        "loop": true,
-        "fade": 2.5
-      }
+      "imageAlt": "芙眠眠坐在樱花树下的木楼梯上。"
     },
     {
       "id": "companionship",

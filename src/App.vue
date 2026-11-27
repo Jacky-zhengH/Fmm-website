@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { Music } from './audio'
+import type { Playback } from './audio'
 import { clockFrom, getCountdown } from './clock'
 import { loadLetter, loadMemory, memoryAsset, memoryPath, memoryTrack } from './content'
 import type { Memory } from './content'
@@ -9,8 +10,10 @@ import type { PosterSize } from './poster'
 
 type Phase = 'loading' | 'waiting' | 'arriving' | 'ready' | 'opening' | 'reading' | 'finale' | 'poster' | 'error'
 
+declare const __LOCAL_DOCUMENT_AUDIO__: string
 const archive = location.pathname === '/' || location.pathname === '/index.html'
 const isDevelopment = import.meta.env.DEV
+const localMusic = isDevelopment && typeof __LOCAL_DOCUMENT_AUDIO__ !== 'undefined' ? __LOCAL_DOCUMENT_AUDIO__ : ''
 const simulatedAt = isDevelopment ? new URLSearchParams(location.search).get('at') : null
 const now = clockFrom(simulatedAt)
 const memory = ref<Memory>()
@@ -20,8 +23,7 @@ const chapterIndex = ref(0)
 const letter = ref(new Map<string, string[]>())
 const letterStatus = ref<'pending' | 'loaded' | 'error'>('pending')
 const imageFailed = ref(false)
-const musicStatus = ref('音乐关闭')
-const musicOn = ref(false)
+const playback = ref<Playback>({ status: 'idle', elapsed: 0, duration: 0, muted: false })
 const volume = ref(0.65)
 const posterSize = ref<PosterSize>('portrait')
 const posterCanvas = ref<HTMLCanvasElement>()
@@ -30,17 +32,43 @@ const posterFailed = ref(false)
 const capture = ref(false)
 const heading = ref<HTMLElement>()
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)')
-const music = new Music(status => {
-  musicStatus.value = status
-  musicOn.value = music.enabled
-})
-let manuallyControlled = false
+const music = new Music(state => { playback.value = state })
 let clockTimer: number | undefined
 let sceneTimer: number | undefined
 let posterRevision = 0
 let letterRequest: Promise<void> | undefined
 
 const firstStage = computed(() => ['waiting', 'arriving', 'ready', 'opening'].includes(phase.value))
+const musicTrack = computed(() => {
+  const setting = memory.value?.music
+  if (!setting) return undefined
+  const mainSource = localMusic || memoryAsset(setting.src)
+  return mainSource
+    ? { src: mainSource, title: setting.title, volume: setting.volume, cues: setting.cues }
+    : memoryTrack(setting.fallback)
+})
+const musicCue = computed(() => {
+  if (memory.value?.animations === false) return undefined
+  const track = musicTrack.value
+  if (!track || !('cues' in track) || !Array.isArray(track.cues)) return undefined
+  return track.cues.reduce<(typeof track.cues)[number]['tone'] | undefined>(
+    (tone, cue) => playback.value.elapsed >= cue.at ? cue.tone : tone,
+    undefined,
+  )
+})
+const playLabel = computed(() => ({
+  idle: '播放音乐',
+  loading: '暂停音乐',
+  playing: '暂停音乐',
+  paused: '继续播放',
+  ended: '重播音乐',
+  error: '重试音乐',
+})[playback.value.status])
+const musicNotice = computed(() => {
+  if (playback.value.status === 'ended') return '音乐已结束，可继续阅读或手动重播。'
+  if (playback.value.status === 'error') return '音乐暂时无法播放，信件可继续阅读。'
+  return ''
+})
 const locked = computed(() => phase.value === 'waiting')
 const chapter = computed(() => memory.value?.chapters[chapterIndex.value])
 const paragraphs = computed(() => chapter.value ? letter.value.get(chapter.value.title) ?? [] : [])
@@ -78,10 +106,9 @@ function updateClock() {
   }
 }
 
-function toggleMusic() {
-  manuallyControlled = true
-  music.toggle()
-  musicOn.value = music.enabled
+function formatTime(seconds: number) {
+  const total = Math.floor(seconds)
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
 }
 
 function changeVolume(event: Event) {
@@ -102,9 +129,7 @@ function requestLetter() {
 
 function openLetter() {
   if (phase.value !== 'ready' || !memory.value) return
-  music.setTrack(memoryTrack(memory.value.chapters[0]?.music))
-  if (!manuallyControlled) music.enable()
-  musicOn.value = music.enabled
+  if (musicTrack.value) music.start(musicTrack.value)
   if (!letterRequest) requestLetter()
   if (!allowMotion()) {
     showChapter(0)
@@ -126,8 +151,6 @@ function showChapter(index: number) {
   chapterIndex.value = index
   imageFailed.value = false
   phase.value = 'reading'
-  music.setTrack(memoryTrack(memory.value.chapters[index]?.music))
-  music.prime(memoryTrack(memory.value.chapters[index + 1]?.music ?? memory.value.finaleMusic))
   focusScene()
 }
 
@@ -164,7 +187,6 @@ function showFinale() {
   if (posterUrl.value) URL.revokeObjectURL(posterUrl.value)
   posterUrl.value = ''
   phase.value = 'finale'
-  music.setTrack(memoryTrack(memory.value?.finaleMusic))
   focusScene()
 }
 
@@ -238,11 +260,9 @@ onMounted(async () => {
     if (now() < Date.parse(memory.value.unlockAt)) {
       phase.value = 'waiting'
       updateClock()
-      music.setTrack(memoryTrack(memory.value.waitingMusic))
       if (phase.value === 'waiting') clockTimer = window.setInterval(updateClock, 200)
     } else {
       phase.value = 'ready'
-      music.setTrack(memoryTrack(memory.value.waitingMusic ?? memory.value.chapters[0]?.music))
     }
   } catch {
     phase.value = 'error'
@@ -263,23 +283,24 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="site" :class="{ 'capture-mode': capture, 'still': memory?.animations === false }" :data-phase="phase">
+  <div class="site" :class="{ 'capture-mode': capture, 'still': memory?.animations === false }" :data-phase="phase" :data-music-cue="musicCue">
     <a v-if="!capture" class="skip" href="#content">跳至正文</a>
     <header v-if="!capture" class="masthead page-width">
       <a class="brand" href="/" aria-label="Midnight Letters 深夜来信，档案首页">
         <span class="brand-mark" aria-hidden="true"><i></i></span>
         <span>Midnight Letters<small>深夜来信</small></span>
       </a>
-      <div v-if="!archive && memory" class="audio-controls">
-        <label v-if="musicOn" class="volume">
+      <div v-if="musicTrack && ['opening', 'reading', 'finale', 'poster'].includes(phase)" class="audio-controls">
+        <div class="track-info">
+          <span>{{ musicTrack.title }}</span>
+          <span v-if="playback.duration" class="track-time" aria-label="音乐播放进度">{{ formatTime(playback.elapsed) }} / {{ formatTime(playback.duration) }}</span>
+        </div>
+        <label class="volume">
           <span class="sr-only">音乐音量</span>
           <input type="range" min="0" max="1" step="0.05" :value="volume" @input="changeVolume">
         </label>
-        <button type="button" class="music-button" :aria-pressed="musicOn" :title="musicStatus" @click="toggleMusic">
-          <span class="equalizer" :class="{ playing: musicOn }" aria-hidden="true"><i></i><i></i><i></i></span>
-          {{ musicOn ? '关闭音乐' : '开启音乐' }}
-        </button>
-        <span class="sr-only" role="status">{{ musicStatus }}</span>
+        <button type="button" class="music-button" @click="music.togglePlayback()">{{ playLabel }}</button>
+        <button type="button" class="music-button mute-button" :aria-pressed="playback.muted" @click="music.toggleMute()">{{ playback.muted ? '取消静音' : '静音' }}</button>
       </div>
     </header>
 
@@ -315,7 +336,7 @@ onUnmounted(() => {
             <p v-if="phase === 'arriving'" class="arriving-note" role="status">封存时间已到</p>
             <template v-if="phase === 'ready'">
               <button class="action" type="button" @click="openLetter">拆开来信</button>
-              <p class="hint">{{ manuallyControlled && !musicOn ? '音乐已关闭' : '点击拆信即可播放章节配乐' }}</p>
+              <p v-if="musicTrack" class="hint">拆信后将播放配乐</p>
             </template>
             <button v-if="phase === 'opening'" class="text-action" type="button" @click="finishOpening">跳过动画</button>
           </div>
@@ -415,7 +436,7 @@ onUnmounted(() => {
 
     <footer v-if="!capture" class="site-footer page-width">
       <span>{{ archive ? '纪念档案' : (memory?.title || '深夜来信') }}</span>
-      <span v-if="!archive && musicStatus !== '音乐关闭'" class="current-track">{{ musicStatus }}</span>
+      <span v-if="musicNotice" class="current-track" role="status">{{ musicNotice }}</span>
       <span v-else-if="simulatedAt" class="current-track">本地时间模拟</span>
       <span>{{ memory?.displayDate || 'Midnight Letters' }}<span v-if="!archive"> · CST</span></span>
     </footer>
