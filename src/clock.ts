@@ -1,3 +1,9 @@
+const publicReviewPath = '/memories/nemu-200/preview'
+
+export function isPublicReviewPath(pathname: string) {
+  return pathname === publicReviewPath || pathname === `${publicReviewPath}/` || pathname === `${publicReviewPath}/index.html`
+}
+
 export function getCountdown(target: number, now: number) {
   const total = Math.max(0, Math.ceil((target - now) / 1000))
   return [

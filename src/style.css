@@ -136,16 +136,83 @@ button.envelope-button:hover .envelope, button.envelope-button:focus-visible .en
 .paper-head h1 { margin: 0; font: 400 clamp(1.55rem, 2.9vw, 2.15rem)/1.32 var(--serif); letter-spacing: 0.04em; overflow-wrap: anywhere; }
 .draft-note { color: #6f5d4b; font-size: 0.78rem; margin: 0; }
 .letter-content { display: grid; gap: 1rem; padding-block: clamp(1rem, 3svh, 1.65rem); }
-.chapter-image { display: block; justify-self: center; align-self: start; width: auto; height: auto; max-width: 100%; max-height: min(39svh, 20rem); object-fit: contain; }
+.chapter-image { display: block; justify-self: center; align-self: start; width: auto; height: auto; max-width: 100%; max-height: min(39svh, 20rem); object-fit: contain; padding: 0.26rem; border: 1px solid #bca482; border-radius: 0.16rem; background: #fbf2e3; box-shadow: 0 0.45rem 1rem #61482d24; }
 .letter-text { min-width: 0; font: 1.125rem/1.95 var(--serif); overflow-wrap: anywhere; }
+.letter-paper:not(.storybook-paper) .letter-text { display: flow-root; }
 .letter-text p { margin: 0; white-space: pre-line; }
 .letter-text p + p { margin-top: 0.9em; }
+.letter-content:not(.illustrated) .letter-text { width: min(100%, 41rem); margin-inline: auto; }
 .signature { text-align: right; }
 .letter-nav { display: flex; align-items: center; gap: 0.5rem; justify-content: space-between; border-top: 1px solid #9e7d5359; padding-top: 0.75rem; }
 .letter-nav span { font: 0.95rem var(--latin); color: #63533f; }
 .letter-nav .action { min-height: 44px; background-color: #342b2a; border-color: #342b2a; color: var(--cream); }
 .letter-nav .action:hover { background-color: #4d3a2f; }
 .letter-paper :focus-visible { outline-color: #735436; }
+
+.storybook-paper {
+  --story-ink: #634457;
+  --story-line: #a57f5880;
+  position: relative;
+  border-color: #c9a97c;
+  border-radius: 0.5rem;
+  color: #342a31;
+  background:
+    radial-gradient(ellipse at 97% 5%, #d9b1c366, transparent 27rem),
+    radial-gradient(ellipse at 2% 96%, #b3bb9160, transparent 23rem),
+    repeating-linear-gradient(108deg, #835c3510 0, #835c3510 1px, transparent 1px, transparent 5px),
+    linear-gradient(152deg, #fffaef, #faf0dc 57%, #f4e2ca);
+  box-shadow: inset 0 0 2.5rem #996b3d30, 0 1.15rem 3rem #03060778;
+}
+.storybook-paper::before {
+  content: "";
+  position: absolute;
+  inset: 0.55rem;
+  pointer-events: none;
+  border: 1px solid var(--story-line);
+  outline: 1px solid #a57f5840;
+  outline-offset: -0.25rem;
+  border-radius: 0.28rem;
+}
+.storybook-paper .paper-head {
+  display: grid;
+  justify-content: center;
+  justify-items: center;
+  gap: 0.55rem;
+  padding: 0.1rem 0.15rem 1rem;
+  border-color: var(--story-line);
+  text-align: center;
+  color: var(--story-ink);
+}
+.storybook-paper .paper-head::before {
+  content: "";
+  width: 1.1rem;
+  aspect-ratio: 1;
+  background: linear-gradient(155deg, #aa8153, #855b7d);
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+}
+.storybook-paper .paper-head h1 { font-size: clamp(1.65rem, 3.2vw, 2.45rem); line-height: 1.35; letter-spacing: 0.06em; }
+.storybook-paper .letter-content { max-width: 41rem; margin-inline: auto; }
+.storybook-paper .letter-text { line-height: 2; }
+.storybook-paper .letter-text > p:first-of-type { padding-inline-start: 0.8rem; border-inline-start: 1px solid var(--story-line); color: var(--story-ink); font-size: 0.93em; }
+.storybook-paper .letter-text > p:nth-of-type(2)::first-letter { color: var(--story-ink); font-size: 1.65em; line-height: 1; }
+.storybook-paper .letter-content.illustrated { gap: 0; }
+.storybook-paper .letter-content.illustrated .letter-text { display: contents; }
+.storybook-paper .chapter-image {
+  grid-row: 2;
+  align-self: center;
+  width: min(100%, 26rem);
+  max-height: 13rem;
+  aspect-ratio: 1.82;
+  margin-block: 0.85rem 0.4rem;
+  object-fit: cover;
+  object-position: center 44%;
+  background: #fcf3e2;
+  border-color: #b99570;
+  border-radius: 43% 43% 0.3rem 0.3rem / 21% 21% 0.3rem 0.3rem;
+}
+.storybook-paper .letter-nav { border-color: var(--story-line); }
+.storybook-paper .letter-nav .action { background-color: #5c3e54; border-color: #5c3e54; }
+.storybook-paper .letter-nav .action:hover { background-color: #744d69; }
 
 .finale { min-height: min(73svh, 680px); display: grid; align-content: center; justify-items: center; padding: 3rem 1rem; margin-block: 1.5rem; border: 1px solid var(--rule); background: linear-gradient(90deg, #0e1724e8, #0e172465), url('/share-cover.webp') center 47% / cover; text-align: center; }
 .finale .day-title { margin-top: 0.1em; }
@@ -169,7 +236,26 @@ button.envelope-button:hover .envelope, button.envelope-button:focus-visible .en
 
 @media (min-width: 740px) {
   .letter-paper { padding-block: clamp(1.15rem, 3.1svh, 2.35rem); }
-  .letter-content.illustrated { grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr); align-items: center; gap: clamp(1.25rem, 3vw, 2rem); }
+  .letter-paper:not(.storybook-paper) .chapter-image {
+    float: right;
+    max-width: min(40%, 18rem);
+    max-height: min(37svh, 18rem);
+    margin: 0.22rem 0 0.9rem clamp(1rem, 2.75vw, 1.7rem);
+  }
+  .storybook-paper .letter-content.illustrated { grid-template-columns: minmax(0, 1fr) minmax(12rem, 0.75fr); column-gap: clamp(1.1rem, 3vw, 2rem); align-items: start; }
+  .storybook-paper .letter-text > p { grid-column: 1 / -1; }
+  .storybook-paper .letter-text > p:nth-of-type(-n+2) { grid-column: 1; }
+  .storybook-paper .chapter-image { grid-area: 1 / 2 / span 2; margin-block: 0; }
+}
+
+@media (max-width: 739px) {
+  .letter-paper:not(.storybook-paper) .letter-content.illustrated .letter-text { display: grid; }
+  .letter-paper:not(.storybook-paper) .chapter-image {
+    grid-row: 3;
+    max-width: min(100%, 22rem);
+    max-height: min(40svh, 18rem);
+    margin-block: 0.85rem 0.15rem;
+  }
 }
 
 @media (max-width: 899px) {
@@ -205,7 +291,7 @@ button.envelope-button:hover .envelope, button.envelope-button:focus-visible .en
   .site-footer { min-height: 57px; letter-spacing: 0.025em; }
   .reading { padding-block: 1rem 1.4rem; }
   .letter-text { font-size: 1.05rem; }
-  .chapter-image { max-height: min(50svh, 23rem); }
+  .storybook-paper .chapter-image { width: min(100%, 18rem); max-height: 10rem; }
   .letter-nav .action { padding-inline: 0.75rem; }
   .poster-page { grid-template-columns: minmax(0, 1fr); }
   .poster-sheet { grid-row: 1; }

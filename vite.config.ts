@@ -96,6 +96,7 @@ export default defineConfig(({ mode, command, isPreview }) => {
         input: {
           archive: 'index.html',
           nemu200: 'memories/nemu-200/index.html',
+          nemu200Preview: 'memories/nemu-200/preview/index.html',
         },
       },
     },
