@@ -139,18 +139,19 @@ async function readLrc(url: string) {
 
 async function requestLyrics() {
   try {
+    const setting = memory.value?.music
+    const japanese = memoryAsset(setting?.lyrics?.japanese)
+    const chinese = memoryAsset(setting?.lyrics?.chinese)
     let files: [string, string]
-    if (import.meta.env.DEV && localMusic) {
+    if (japanese && chinese && memoryAsset(setting?.src)) {
+      files = await Promise.all([readLrc(japanese), readLrc(chinese)])
+    } else if (import.meta.env.DEV && localMusic) {
       files = await Promise.all([
         readLrc('/__local-document.ja.lrc'),
         readLrc('/__local-document.zh.lrc'),
       ])
     } else {
-      const setting = memory.value?.music
-      const japanese = memoryAsset(setting?.lyrics?.japanese)
-      const chinese = memoryAsset(setting?.lyrics?.chinese)
-      if (!japanese || !chinese || !memoryAsset(setting?.src)) return
-      files = await Promise.all([readLrc(japanese), readLrc(chinese)])
+      return
     }
     const cues = parseBilingualLyrics(...files)
     if (cues.some(({ japanese, chinese }) => japanese && chinese)) lyrics.value = cues
